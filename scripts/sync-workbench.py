@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Copy the Feature specification canvas into each open workspace.
+"""Copy Software Engineering Workbench surfaces into each open workspace.
 
 Reads Cursor hook JSON from stdin. Writes {} to stdout. Never copies
-feature-specification.canvas.data.json (that file is per workspace).
+*.canvas.data.json (those files are per workspace).
 """
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ import sys
 import tempfile
 from pathlib import Path
 
-SOURCE_ROOT = Path.home() / "Projects" / "feature-spec-canvas"
+SOURCE_ROOT = Path.home() / "Projects" / "software-engineering-workbench"
 CANVAS_NAME = "feature-specification.canvas.tsx"
 RULE_NAME = "feature-specification-canvas.mdc"
 

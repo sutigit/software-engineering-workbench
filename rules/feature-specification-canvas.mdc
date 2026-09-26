@@ -9,7 +9,7 @@ The Feature specification canvas is `feature-specification.canvas.tsx` in this
 workspace canvases folder. Persisted data is
 `feature-specification.canvas.data.json` next to it.
 
-Edit the canvas source in `~/Projects/feature-spec-canvas/`. A user hook copies
+Edit the canvas source in `~/Projects/software-engineering-workbench/`. A user hook copies
 that file into each workspace. Do not treat the workspace copy as the source.
 
 ## Human-owned (do not edit)
