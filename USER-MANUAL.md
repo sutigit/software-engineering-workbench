@@ -3,41 +3,56 @@
 How to open and use the workbench inside a Cursor workspace. Setup of the sync
 hook is in `README.md`. Rules for agents are in `AGENTS.md`.
 
-## Open a surface
+## Open the workbench
 
 1. Open the workspace folder in Cursor.
 2. Press `Cmd+Shift+P`.
 3. Run **Open Canvas**.
-4. Pick the surface, for example **Feature specification**.
+4. Pick **workbench**.
 
 Other ways:
 
 - Click a canvas card or canvas file link that the agent posts in chat.
-- Ask the agent: "open the feature specification canvas".
+- Ask the agent: "open the workbench canvas".
 
-If the surface is not in the list, the sync hook has not run for this
+If **workbench** is not in the list, the sync hook has not run for this
 workspace yet. Start a new chat in the workspace, or run the manual sync
 command from `README.md`. Then run **Open Canvas** again.
+
+## Hub
+
+The workbench opens with a sidebar on the left and a page on the right.
+
+- The sidebar lists **Overview** and one entry per surface. Click an entry to
+  show that page. The workbench remembers the open page.
+- **Overview** shows one card per surface with its purpose. **Open** on a card
+  shows that surface.
 
 ## Where your data lives
 
 Each workspace keeps its own content in
-`~/.cursor/projects/<workspace>/canvases/<surface>.canvas.data.json`. Edits are
-saved automatically. Nothing is shared between workspaces, and nothing is
+`~/.cursor/projects/<workspace>/canvases/workbench.canvas.data.json`. Edits
+are saved automatically. Nothing is shared between workspaces, and nothing is
 uploaded.
 
 A fresh workspace opens empty.
 
-## Feature specification
+If you used the earlier standalone Feature specification canvas, the sync hook
+copies its data into the workbench file once. Your rows are kept.
 
-Use this surface to write a feature spec that an agent implements.
+## Feature specification, UI elements, Functional elements
 
-### Layout
+These three pages together describe one feature that an agent implements.
+Open each from the sidebar or from its Overview card. Each page shows only its
+own tables. All three pages save into the same data file.
 
-- **Feature name** input at the top.
-- Four tables: **User stories**, **Acceptance criteria**, **UI elements**,
-  **Functional elements**. Each table is a collapsible section with a row
-  count.
+- **Feature specification** has a **Feature name** input at the top and two
+  tables: **User stories** and **Acceptance criteria**.
+- **UI elements** has one table, **UI elements**.
+- **Functional elements** has one table, **Functional elements**.
+
+Each table is a collapsible section with a row count. The sections below apply
+to every table on the three pages.
 
 ### Rows
 
@@ -85,9 +100,10 @@ Code cells:
 
 ### Work with the agent
 
-1. Fill the Edit columns and mark which rows matter.
+1. Fill the Edit columns on the three pages and mark which rows matter.
 2. Ask the agent to implement the specification.
-3. The agent reads your rows and writes the Read-only columns.
+3. The agent reads your rows on all three pages and writes the Read-only
+   columns.
 4. Tick **Done** on rows that are complete.
 
 ## Update the source, not the copy

@@ -7,21 +7,35 @@ documentation. The repo path is `~/Projects/software-engineering-workbench`.
 This file is for agents that evolve the workbench. Rules under `rules/` are for
 agents that use one surface inside a product workspace. Keep those jobs apart.
 
-## Surfaces
+## Hub and surfaces
 
-A surface is one workbench UI (a Cursor canvas), an optional workspace rule for
-agents, and per-workspace data that stays local.
+The workbench is one Cursor canvas, `workbench.canvas.tsx`. A canvas is a
+single file with no relative imports, so every surface is a page inside that
+file. The hub is the sidebar and the Overview page. It lists the surfaces from
+the `surfaces` array and shows one page at a time. The open page is stored in
+the `hubPage` key.
 
-| Surface | Source | Workspace rule | Status |
-| --- | --- | --- | --- |
-| Feature specification | `feature-specification.canvas.tsx` | `rules/feature-specification-canvas.mdc` | Active |
+A surface is one page in the hub, an optional workspace rule for agents, and
+per-workspace data that stays local. All surfaces share
+`workbench.canvas.data.json`; each surface owns its own top-level keys.
+
+| Surface               | Page component             | Workspace rule               | Status |
+| --------------------- | -------------------------- | ---------------------------- | ------ |
+| Feature specification | `FeatureSpecificationPage` | `rules/workbench-canvas.mdc` | Active |
+| UI elements           | `UiElementsPage`           | `rules/workbench-canvas.mdc` | Active |
+| Functional elements   | `FunctionalElementsPage`   | `rules/workbench-canvas.mdc` | Active |
+
+Feature specification, UI elements, and Functional elements are three pages
+over one data set. They render `SpecPage` with different table lists and share
+the `specColumns`, `specRows`, and `agentCells` keys, each keyed by table id.
+They share one rule for the same reason. Data saved before the split loads
+unchanged.
 
 Planned kinds: architecture diagrams, test coverage catalogue, docs, CI/CD, and
-kinds the user adds later. A hub UI will list surfaces and open the matching
-documentation. Build a surface or the hub only when the user asks.
+kinds the user adds later. Build a surface only when the user asks.
 
-Every surface must stay hub-ready: stable canvas filename, a title, and a
-one-line purpose.
+Every surface has a stable `id`, a title, and a one-line purpose in the
+`surfaces` array. The Overview page renders those fields.
 
 Distribution: `scripts/sync-workbench.py`, run by the user hook.
 Hook setup and the manual sync command are in `README.md`.
@@ -33,27 +47,33 @@ Applies to every current and future surface.
 
 - Source lives in this repo. Copies under `~/.cursor/projects/<id>/canvases/`
   are overwrite targets. Never edit them as source.
-- `*.canvas.data.json` is per workspace. Never copy it. Never seed it.
+- `*.canvas.data.json` is per workspace. Never copy it between workspaces.
+  Never seed it. The sync script may move a workspace's own data file to a
+  new canvas file name.
 - Defaults are empty. No demo rows, no sample feature names.
 - Old data files must load. Missing keys and short cell arrays read as empty.
-- `useCanvasState` keys are a public schema. Change a shape only with a reader
-  for the old shape.
+- `useCanvasState` keys are a public schema shared by all surfaces in the
+  data file. Prefix new keys with the surface, and change a shape only with a
+  reader for the old shape.
 - UI imports from `cursor/canvas` only. Follow the Cursor canvas skill.
-- Human and agent ownership is defined per surface in its rule under `rules/`.
+- Human and agent ownership is defined per surface in a section of
+  `rules/workbench-canvas.mdc`, the one rule the hook copies into workspaces.
   Do not restate it here.
 
 ## Change protocol
 
 Classify the request first.
 
-- New surface: new canvas, a rule under `rules/` if agents write to it, extend
-  the sync script, add a row to the Surfaces table. Do not add unrelated
-  domains to an existing surface's tables.
-- Existing surface UI or schema: edit that surface's source. Keep the contract.
-- Agent behaviour inside a product workspace: edit that surface's rule.
+- New surface: a page component in `workbench.canvas.tsx`, an entry in the
+  `surfaces` array, a section in `rules/workbench-canvas.mdc` if agents write
+  to it, add a row to the Surfaces table. Do not add unrelated domains to an
+  existing surface's tables.
+- Existing surface UI or schema: edit that surface's page. Keep the contract.
+- Hub UI: edit the hub components at the top of `workbench.canvas.tsx`.
+- Agent behaviour inside a product workspace: edit that surface's section in
+  `rules/workbench-canvas.mdc`.
 - Distribution: edit the sync script, and `README.md` if the command changes.
 - One product workspace's content: local data only. Do not change this repo.
-- Hub: a later canvas that opens other surfaces. Only when the user asks.
 
 Then:
 
@@ -82,4 +102,5 @@ duplicate `README.md` setup steps in the manual; link to them.
 - New tables, columns, or surfaces do not require existing data files to gain
   keys.
 - No historical key is removed without a reader for the old name.
+- A stored `hubPage` that names no surface opens the Overview page.
 - A fresh workspace opens empty.

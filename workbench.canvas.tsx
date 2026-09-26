@@ -1,7 +1,11 @@
 import {
   Button,
+  Card,
+  CardBody,
+  CardHeader,
   Checkbox,
   CollapsibleSection,
+  Grid,
   H1,
   IconButton,
   Row,
@@ -17,6 +21,177 @@ import {
   useRef,
 } from "cursor/canvas";
 
+// MARK: - Hub
+
+// A canvas is one file with no relative imports, so every surface is a page
+// inside this file. The hub lists the pages and shows one at a time.
+
+const OVERVIEW_PAGE_ID = "overview";
+const SIDEBAR_WIDTH = 220;
+const PAGE_PADDING = 24;
+
+type SurfacePage = typeof FeatureSpecificationPage;
+
+type Surface = {
+  id: string;
+  title: string;
+  purpose: string;
+  Page: SurfacePage;
+};
+
+const surfaces: Surface[] = [
+  {
+    id: "feature-specification",
+    title: "Feature specification",
+    purpose: "Write a feature spec that an agent implements.",
+    Page: FeatureSpecificationPage,
+  },
+  {
+    id: "ui-elements",
+    title: "UI elements",
+    purpose: "List the UI elements of the feature and their interfaces.",
+    Page: UiElementsPage,
+  },
+  {
+    id: "functional-elements",
+    title: "Functional elements",
+    purpose: "List the hooks of the feature and their interfaces.",
+    Page: FunctionalElementsPage,
+  },
+];
+
+export default function WorkbenchCanvas() {
+  const [storedPageId, setPageId] = useCanvasState<string>("hubPage", OVERVIEW_PAGE_ID);
+  // A stored id can point at a surface that no longer exists.
+  const activeSurface = surfaces.find((surface) => surface.id === storedPageId);
+  const pageId = activeSurface ? activeSurface.id : OVERVIEW_PAGE_ID;
+
+  return (
+    <Row align="stretch" gap={0} style={{ minHeight: "100vh" }}>
+      <HubSidebar activePageId={pageId} onSelect={setPageId} />
+      <div style={{ flex: 1, minWidth: 0, padding: PAGE_PADDING }}>
+        {activeSurface ? (
+          <activeSurface.Page />
+        ) : (
+          <OverviewPage onOpen={setPageId} />
+        )}
+      </div>
+    </Row>
+  );
+}
+
+type HubSidebarProps = {
+  activePageId: string;
+  onSelect: (pageId: string) => void;
+};
+
+function HubSidebar({ activePageId, onSelect }: HubSidebarProps) {
+  const theme = useHostTheme();
+  return (
+    <Stack
+      gap={16}
+      style={{
+        width: SIDEBAR_WIDTH,
+        flexShrink: 0,
+        padding: 16,
+        borderRight: `1px solid ${theme.stroke.tertiary}`,
+      }}
+    >
+      <Stack gap={2}>
+        <Text weight="semibold">Workbench</Text>
+        <Text size="small" tone="tertiary">
+          Project documentation surfaces
+        </Text>
+      </Stack>
+      <Stack gap={2}>
+        <SidebarItem
+          label="Overview"
+          active={activePageId === OVERVIEW_PAGE_ID}
+          onClick={() => onSelect(OVERVIEW_PAGE_ID)}
+        />
+        {surfaces.map((surface) => (
+          <SidebarItem
+            key={surface.id}
+            label={surface.title}
+            active={activePageId === surface.id}
+            onClick={() => onSelect(surface.id)}
+          />
+        ))}
+      </Stack>
+    </Stack>
+  );
+}
+
+type SidebarItemProps = {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+};
+
+function SidebarItem({ label, active, onClick }: SidebarItemProps) {
+  const theme = useHostTheme();
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        display: "block",
+        width: "100%",
+        textAlign: "left",
+        font: "inherit",
+        fontSize: 13,
+        padding: "6px 8px",
+        border: "none",
+        borderRadius: theme.radius.sm,
+        cursor: "pointer",
+        color: active ? theme.text.primary : theme.text.secondary,
+        background: active ? theme.fill.secondary : "transparent",
+      }}
+    >
+      {label}
+    </button>
+  );
+}
+
+function OverviewPage({ onOpen }: { onOpen: (pageId: string) => void }) {
+  return (
+    <Stack gap={24} style={{ maxWidth: 960 }}>
+      <Stack gap={8}>
+        <H1>Software Engineering Workbench</H1>
+        <Text size="small" tone="tertiary">
+          Each surface documents one part of this project. Data stays in this workspace.
+        </Text>
+      </Stack>
+      <Grid columns="repeat(auto-fill, minmax(280px, 1fr))" gap={16}>
+        {surfaces.map((surface) => (
+          <Card key={surface.id}>
+            <CardHeader>{surface.title}</CardHeader>
+            <CardBody>
+              <Stack gap={12}>
+                <Text size="small" tone="secondary">
+                  {surface.purpose}
+                </Text>
+                <Row>
+                  <Button variant="secondary" onClick={() => onOpen(surface.id)}>
+                    Open
+                  </Button>
+                </Row>
+              </Stack>
+            </CardBody>
+          </Card>
+        ))}
+      </Grid>
+    </Stack>
+  );
+}
+
+// MARK: - Feature specification
+
+// Feature specification, UI elements, and Functional elements are three pages
+// over one data set. They share the `specColumns`, `specRows`, and
+// `agentCells` keys, each keyed by table id, so data saved before the split
+// still loads.
+//
 // Column ownership (not a hard IDE lock; agents can still edit files):
 // - Edit (readOnly false): human. Never change those cell values.
 // - Read-only (readOnly true): agent. Write only into `agentCells`.
@@ -42,6 +217,8 @@ type SpecRow = {
 
 type SpecRowsByTable = Record<string, SpecRow[]>;
 
+const SPEC_PAGE_MAX_WIDTH = 1400;
+const FEATURE_NAME_MAX_WIDTH = 360;
 const TEXT_CELL_MIN_WIDTH = 200;
 const CODE_CELL_MIN_WIDTH = 360;
 const CODE_CELL_MIN_ROWS = 4;
@@ -66,10 +243,14 @@ const code = (id: string, name: string, readOnly = false): SpecColumn => ({
 
 type TableMeta = { id: string; title: string };
 
-const tableMeta: TableMeta[] = [
+const featureSpecificationTables: TableMeta[] = [
   { id: "user-stories", title: "User stories" },
   { id: "acceptance-criteria", title: "Acceptance criteria" },
-  { id: "ui-elements", title: "UI elements" },
+];
+
+const uiElementsTables: TableMeta[] = [{ id: "ui-elements", title: "UI elements" }];
+
+const functionalElementsTables: TableMeta[] = [
   { id: "functional-elements", title: "Functional elements" },
 ];
 
@@ -100,8 +281,38 @@ const seedRows: SpecRowsByTable = {
   "functional-elements": [],
 };
 
-export default function FeatureSpecificationCanvas() {
+function FeatureSpecificationPage() {
   const [featureName, setFeatureName] = useCanvasState("featureName", "");
+  return (
+    <SpecPage
+      title="Feature specification"
+      tables={featureSpecificationTables}
+      featureNameInput={{ value: featureName, onChange: setFeatureName }}
+    />
+  );
+}
+
+function UiElementsPage() {
+  return <SpecPage title="UI elements" tables={uiElementsTables} />;
+}
+
+function FunctionalElementsPage() {
+  return <SpecPage title="Functional elements" tables={functionalElementsTables} />;
+}
+
+type FeatureNameInput = {
+  value: string;
+  onChange: (value: string) => void;
+};
+
+type SpecPageProps = {
+  title: string;
+  tables: TableMeta[];
+  // Only the Feature specification page names the feature.
+  featureNameInput?: FeatureNameInput;
+};
+
+function SpecPage({ title, tables, featureNameInput }: SpecPageProps) {
   const [columnsByTable, setColumnsByTable] = useCanvasState("specColumns", seedColumns);
   const [rowsByTable, setRowsByTable] = useCanvasState<SpecRowsByTable>("specRows", seedRows);
   const [agentCells] = useCanvasState<AgentCells>("agentCells", {});
@@ -122,15 +333,17 @@ export default function FeatureSpecificationCanvas() {
     }));
 
   return (
-    <Stack gap={24} style={{ padding: 24, maxWidth: 1400 }}>
+    <Stack gap={24} style={{ maxWidth: SPEC_PAGE_MAX_WIDTH }}>
       <Stack gap={8}>
-        <H1>Feature specification</H1>
-        <TextInput
-          value={featureName}
-          onChange={setFeatureName}
-          placeholder="Feature name"
-          style={{ maxWidth: 360 }}
-        />
+        <H1>{title}</H1>
+        {featureNameInput && (
+          <TextInput
+            value={featureNameInput.value}
+            onChange={featureNameInput.onChange}
+            placeholder="Feature name"
+            style={{ maxWidth: FEATURE_NAME_MAX_WIDTH }}
+          />
+        )}
         <Text size="small" tone="tertiary">
           Edits are saved automatically. Ask the agent to implement this specification.
           Edit columns are human-owned. Read-only columns are agent-owned.
@@ -138,7 +351,7 @@ export default function FeatureSpecificationCanvas() {
       </Stack>
 
       <Stack gap={16}>
-        {tableMeta.map((table) => (
+        {tables.map((table) => (
           <SpecTableSection
             key={table.id}
             tableId={table.id}

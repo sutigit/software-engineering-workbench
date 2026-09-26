@@ -1,18 +1,25 @@
 ---
-description: Agent may write only Read-only columns in the Feature specification canvas
+description: Ownership of Workbench canvas data. Agent may write only Read-only columns of the spec pages.
 alwaysApply: true
 ---
 
-# Feature specification canvas ownership
+# Workbench canvas ownership
 
-The Feature specification canvas is `feature-specification.canvas.tsx` in this
-workspace canvases folder. Persisted data is
-`feature-specification.canvas.data.json` next to it.
+The Workbench is the canvas `workbench.canvas.tsx` in this workspace canvases
+folder. Persisted data is `workbench.canvas.data.json` next to it. Do not
+change `hubPage`; it is the page the user has open.
 
 Edit the canvas source in `~/Projects/software-engineering-workbench/`. A user hook copies
 that file into each workspace. Do not treat the workspace copy as the source.
 
-## Human-owned (do not edit)
+## Spec pages
+
+Feature specification (tables `user-stories`, `acceptance-criteria`), UI
+elements (table `ui-elements`), and Functional elements (table
+`functional-elements`) share the keys below. Each key lives at the top level
+of the data file and is keyed by table id.
+
+### Human-owned (do not edit)
 
 Do not change these unless the user explicitly asks:
 
@@ -23,7 +30,7 @@ Do not change these unless the user explicitly asks:
 
 A column is human-owned when `readOnly` is missing or `false` (the **Edit** pill).
 
-## Agent-owned (write only here)
+### Agent-owned (write only here)
 
 Write generated cell values only in `agentCells`:
 
