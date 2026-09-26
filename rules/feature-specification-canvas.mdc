@@ -1,0 +1,45 @@
+---
+description: Agent may write only Read-only columns in the Feature specification canvas
+alwaysApply: true
+---
+
+# Feature specification canvas ownership
+
+The Feature specification canvas is `feature-specification.canvas.tsx` in this
+workspace canvases folder. Persisted data is
+`feature-specification.canvas.data.json` next to it.
+
+Edit the canvas source in `~/Projects/feature-spec-canvas/`. A user hook copies
+that file into each workspace. Do not treat the workspace copy as the source.
+
+## Human-owned (do not edit)
+
+Do not change these unless the user explicitly asks:
+
+- `featureName`
+- `specColumns` (names, kinds, order, `readOnly` flags)
+- `specRows` cell text for any column that is **not** Read-only
+- row ids, the Done checkbox, add/delete row or column
+
+A column is human-owned when `readOnly` is missing or `false` (the **Edit** pill).
+
+## Agent-owned (write only here)
+
+Write generated cell values only in `agentCells`:
+
+```json
+{
+  "agentCells": {
+    "<tableId>": {
+      "<rowId>": {
+        "<columnId>": "generated text"
+      }
+    }
+  }
+}
+```
+
+Write only for columns with `readOnly: true` (the **Read-only** pill), or whose
+name is `Interface` when `readOnly` is omitted.
+
+You may **read** human-owned cells to implement the spec. You must not rewrite them.
