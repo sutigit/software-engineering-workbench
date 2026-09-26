@@ -1,7 +1,7 @@
 # Software Engineering Workbench
 
 Source of Software Engineering Workbench. Agents that change this repo read
-`AGENTS.md` first.
+`AGENTS.md` first. Usage instructions are in `USER-MANUAL.md`.
 
 The first surface is the Cursor Feature specification canvas. Edit
 `feature-specification.canvas.tsx` and `rules/feature-specification-canvas.mdc`

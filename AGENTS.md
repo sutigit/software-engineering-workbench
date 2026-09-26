@@ -25,6 +25,7 @@ one-line purpose.
 
 Distribution: `scripts/sync-workbench.py`, run by the user hook.
 Hook setup and the manual sync command are in `README.md`.
+End-user instructions are in `USER-MANUAL.md`.
 
 ## Surface contract
 
@@ -57,10 +58,24 @@ Classify the request first.
 Then:
 
 1. Implement in this repo.
-2. Type-check with the TypeScript compiler against the workspace canvases
+2. Update `USER-MANUAL.md` when the change affects usage. See below.
+3. Type-check with the TypeScript compiler against the workspace canvases
    `tsconfig.json`. Do not trust `npx tsc`; it resolves to the wrong package.
-3. Run the sync script for the workspaces the user names.
-4. Tell the user to reopen the canvas with Command Palette: Open Canvas.
+4. Run the sync script for the workspaces the user names.
+5. Tell the user to reopen the canvas with Command Palette: Open Canvas.
+
+## User manual
+
+`USER-MANUAL.md` describes what a user sees and does. Keep it true to the
+shipped UI. Update it in the same change when you:
+
+- add, rename, or remove a surface, table, column, button, pill, or input;
+- change a keyboard shortcut or an editing behaviour such as `Tab`;
+- change how a surface is opened or where its data is stored;
+- change what the agent writes or what the user owns.
+
+Do not update it for internal refactors that leave the UI unchanged. Do not
+duplicate `README.md` setup steps in the manual; link to them.
 
 ## Compatibility checklist
 
