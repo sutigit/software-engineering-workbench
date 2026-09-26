@@ -94,71 +94,14 @@ const seedColumns: Record<string, SpecColumn[]> = {
 };
 
 const seedRows: SpecRowsByTable = {
-  "user-stories": [
-    { id: "us-1", done: false, cells: ["As a user, I can create a ToDo item"] },
-    { id: "us-2", done: false, cells: ["As a user, I can delete a ToDo item"] },
-    { id: "us-3", done: false, cells: ["As a user, I can edit a ToDo item"] },
-    { id: "us-4", done: false, cells: ["As a user, I can check a ToDo item"] },
-    { id: "us-5", done: false, cells: ["As a user, I can un-check a ToDo item"] },
-  ],
+  "user-stories": [],
   "acceptance-criteria": [],
-  "ui-elements": [
-    {
-      id: "ui-1",
-      done: false,
-      cells: [
-        "Todo item list",
-        "List view that holds the todo items",
-        [
-          "• Given a list of todo items, it will display them",
-          "• Given a create callback, it can call it",
-          "• Given a delete callback, it can pass that responsibility to the todo item",
-          "• Given an edit callback, it can pass that responsibility to the todo item",
-        ].join("\n"),
-        ["• Todo item list", "• Create callback", "• Delete callback", "• Edit callback"].join(
-          "\n",
-        ),
-        "",
-      ],
-    },
-    {
-      id: "ui-2",
-      done: false,
-      cells: [
-        "Todo item",
-        "The main component that represents a todo item.",
-        [
-          "• Given a todo item content, it will display it",
-          "• Given a delete callback, it can pass the todo id to it and call it",
-          "• Given an edit callback, it can pass the todo id and new content to it and call it.",
-        ].join("\n"),
-        ["• Content", "• Delete callback", "• Edit callback"].join("\n"),
-        "",
-      ],
-    },
-  ],
-  "functional-elements": [
-    {
-      id: "fn-1",
-      done: false,
-      cells: [
-        "useTodoItems",
-        "Manages the persistence, creation, deletion and editing of todo items",
-        "• Given the data presentation of the todo items, it can manipulate them and return the new state of the todo items",
-        "• data state (todo items)",
-        [
-          "• new data state (todo items)",
-          "• create function",
-          "• delete function",
-          "• edit function",
-        ].join("\n"),
-      ],
-    },
-  ],
+  "ui-elements": [],
+  "functional-elements": [],
 };
 
 export default function FeatureSpecificationCanvas() {
-  const [featureName, setFeatureName] = useCanvasState("featureName", "ToDo App");
+  const [featureName, setFeatureName] = useCanvasState("featureName", "");
   const [columnsByTable, setColumnsByTable] = useCanvasState("specColumns", seedColumns);
   const [rowsByTable, setRowsByTable] = useCanvasState<SpecRowsByTable>("specRows", seedRows);
   const [agentCells] = useCanvasState<AgentCells>("agentCells", {});
