@@ -7,6 +7,7 @@ import {
   CollapsibleSection,
   Grid,
   H1,
+  H2,
   IconButton,
   Row,
   Stack,
@@ -19,16 +20,50 @@ import {
   useHostTheme,
   useEffect,
   useRef,
+  useState,
+  type SetCanvasState,
 } from "cursor/canvas";
 
 // MARK: - Hub
 
 // A canvas is one file with no relative imports, so every surface is a page
-// inside this file. The hub lists the pages and shows one at a time.
+// inside this file. The sidebar lists tasks. A task owns one copy of every
+// surface; the surfaces are tabs inside the task page.
 
 const OVERVIEW_PAGE_ID = "overview";
 const SIDEBAR_WIDTH = 220;
 const PAGE_PADDING = 24;
+const TASK_NAME_MAX_WIDTH = 360;
+const NEW_TASK_NAME = "Untitled task";
+
+// Spec data saved before tasks existed lives in top-level keys. It becomes
+// this task the first time the canvas opens with the new schema.
+const IMPORTED_TASK_ID = "task-imported";
+const IMPORTED_TASK_NAME = "Imported task";
+
+type Task = {
+  id: string;
+  name: string;
+};
+
+// Spec content of one task. Inner shapes match the pre-task top-level keys
+// `featureName`, `specColumns`, and `specRows`.
+type TaskSpec = {
+  featureName: string;
+  specColumns: Record<string, SpecColumn[]>;
+  specRows: SpecRowsByTable;
+};
+
+type TaskSpecsById = Record<string, TaskSpec>;
+type TaskAgentCellsById = Record<string, AgentCells>;
+
+type SpecUpdate = (spec: TaskSpec) => TaskSpec;
+
+type SurfacePageProps = {
+  spec: TaskSpec;
+  agentCells: AgentCells;
+  onChangeSpec: (update: SpecUpdate) => void;
+};
 
 type SurfacePage = typeof FeatureSpecificationPage;
 
@@ -47,6 +82,12 @@ const surfaces: Surface[] = [
     Page: FeatureSpecificationPage,
   },
   {
+    id: "architecture",
+    title: "Architecture",
+    purpose: "Describe the architecture of the feature.",
+    Page: ArchitecturePage,
+  },
+  {
     id: "ui-elements",
     title: "UI elements",
     purpose: "List the UI elements of the feature and their interfaces.",
@@ -58,34 +99,179 @@ const surfaces: Surface[] = [
     purpose: "List the hooks of the feature and their interfaces.",
     Page: FunctionalElementsPage,
   },
+  {
+    id: "unit-tests",
+    title: "Unit tests",
+    purpose: "List the unit tests of the feature.",
+    Page: UnitTestsPage,
+  },
 ];
 
 export default function WorkbenchCanvas() {
-  const [storedPageId, setPageId] = useCanvasState<string>("hubPage", OVERVIEW_PAGE_ID);
-  // A stored id can point at a surface that no longer exists.
+  // `null` means the key was never written, which is what the legacy import
+  // checks. An empty array means the user deleted every task.
+  const [storedTasks, setTasks] = useCanvasState<Task[] | null>("tasks", null);
+  const [taskSpecs, setTaskSpecs] = useCanvasState<TaskSpecsById>(
+    "taskSpecs",
+    {},
+  );
+  const [taskAgentCells, setTaskAgentCells] =
+    useCanvasState<TaskAgentCellsById>("taskAgentCells", {});
+  const [storedTaskId, setTaskId] = useCanvasState<string>("hubTask", "");
+  const [storedPageId, setPageId] = useCanvasState<string>(
+    "hubPage",
+    OVERVIEW_PAGE_ID,
+  );
+
+  useImportLegacySpec(storedTasks, {
+    setTasks,
+    setTaskSpecs,
+    setTaskAgentCells,
+  });
+
+  const tasks = storedTasks ?? [];
+  // A stored id can point at a task or surface that no longer exists.
+  const activeTask = tasks.find((task) => task.id === storedTaskId) ?? tasks[0];
   const activeSurface = surfaces.find((surface) => surface.id === storedPageId);
   const pageId = activeSurface ? activeSurface.id : OVERVIEW_PAGE_ID;
 
+  const createTask = () => {
+    const task: Task = { id: createTaskId(), name: NEW_TASK_NAME };
+    setTasks((previous) => [...(previous ?? []), task]);
+    setTaskId(task.id);
+    setPageId(OVERVIEW_PAGE_ID);
+  };
+
+  const renameTask = (taskId: string, name: string) =>
+    setTasks((previous) =>
+      (previous ?? []).map((task) =>
+        task.id === taskId ? { ...task, name } : task,
+      ),
+    );
+
+  const deleteTask = (taskId: string) => {
+    setTasks((previous) =>
+      (previous ?? []).filter((task) => task.id !== taskId),
+    );
+    setTaskSpecs((previous) => withoutKey(previous, taskId));
+    setTaskAgentCells((previous) => withoutKey(previous, taskId));
+  };
+
+  const updateSpec = (taskId: string, update: SpecUpdate) =>
+    setTaskSpecs((previous) => ({
+      ...previous,
+      [taskId]: update(normalizeTaskSpec(previous[taskId])),
+    }));
+
   return (
     <Row align="stretch" gap={0} style={{ minHeight: "100vh" }}>
-      <HubSidebar activePageId={pageId} onSelect={setPageId} />
+      <HubSidebar
+        tasks={tasks}
+        activeTaskId={activeTask?.id}
+        onSelect={setTaskId}
+        onCreate={createTask}
+      />
       <div style={{ flex: 1, minWidth: 0, padding: PAGE_PADDING }}>
-        {activeSurface ? (
-          <activeSurface.Page />
+        {activeTask ? (
+          <TaskPage
+            // Remount on task switch so local UI state, such as a pending
+            // delete confirmation, never carries over to another task.
+            key={activeTask.id}
+            task={activeTask}
+            pageId={pageId}
+            spec={normalizeTaskSpec(taskSpecs[activeTask.id])}
+            agentCells={taskAgentCells[activeTask.id] ?? {}}
+            onSelectPage={setPageId}
+            onRename={(name) => renameTask(activeTask.id, name)}
+            onDelete={() => deleteTask(activeTask.id)}
+            onChangeSpec={(update) => updateSpec(activeTask.id, update)}
+          />
         ) : (
-          <OverviewPage onOpen={setPageId} />
+          <NoTasksPage onCreate={createTask} />
         )}
       </div>
     </Row>
   );
 }
 
-type HubSidebarProps = {
-  activePageId: string;
-  onSelect: (pageId: string) => void;
+type LegacyImportSetters = {
+  setTasks: SetCanvasState<Task[] | null>;
+  setTaskSpecs: SetCanvasState<TaskSpecsById>;
+  setTaskAgentCells: SetCanvasState<TaskAgentCellsById>;
 };
 
-function HubSidebar({ activePageId, onSelect }: HubSidebarProps) {
+// Reads the pre-task top-level keys and moves their content into one task.
+// Runs once: only while `tasks` has never been written. The old keys stay in
+// the data file untouched.
+function useImportLegacySpec(
+  storedTasks: Task[] | null,
+  setters: LegacyImportSetters,
+) {
+  const [featureName] = useCanvasState<string>("featureName", "");
+  const [specColumns] = useCanvasState<Record<string, SpecColumn[]>>(
+    "specColumns",
+    {},
+  );
+  const [specRows] = useCanvasState<SpecRowsByTable>("specRows", {});
+  const [agentCells] = useCanvasState<AgentCells>("agentCells", {});
+
+  useEffect(() => {
+    if (storedTasks !== null) return;
+    if (!hasLegacySpecContent(featureName, specRows)) return;
+    setters.setTasks(() => [
+      { id: IMPORTED_TASK_ID, name: featureName.trim() || IMPORTED_TASK_NAME },
+    ]);
+    setters.setTaskSpecs((previous) => ({
+      ...previous,
+      [IMPORTED_TASK_ID]: { featureName, specColumns, specRows },
+    }));
+    setters.setTaskAgentCells((previous) => ({
+      ...previous,
+      [IMPORTED_TASK_ID]: agentCells,
+    }));
+  }, [storedTasks, featureName, specColumns, specRows, agentCells]);
+}
+
+function hasLegacySpecContent(
+  featureName: string,
+  specRows: SpecRowsByTable,
+): boolean {
+  if (featureName.trim() !== "") return true;
+  return Object.values(specRows).some(
+    (rows) => Array.isArray(rows) && rows.length > 0,
+  );
+}
+
+// A stored spec can predate a field. Missing fields read as empty.
+function normalizeTaskSpec(spec: Partial<TaskSpec> | undefined): TaskSpec {
+  return {
+    featureName: spec?.featureName ?? "",
+    specColumns: spec?.specColumns ?? {},
+    specRows: spec?.specRows ?? {},
+  };
+}
+
+function withoutKey<T>(
+  record: Record<string, T>,
+  key: string,
+): Record<string, T> {
+  const { [key]: _removed, ...rest } = record;
+  return rest;
+}
+
+type HubSidebarProps = {
+  tasks: Task[];
+  activeTaskId: string | undefined;
+  onSelect: (taskId: string) => void;
+  onCreate: () => void;
+};
+
+function HubSidebar({
+  tasks,
+  activeTaskId,
+  onSelect,
+  onCreate,
+}: HubSidebarProps) {
   const theme = useHostTheme();
   return (
     <Stack
@@ -100,26 +286,30 @@ function HubSidebar({ activePageId, onSelect }: HubSidebarProps) {
       <Stack gap={2}>
         <Text weight="semibold">Workbench</Text>
         <Text size="small" tone="tertiary">
-          Project documentation surfaces
+          Tasks
         </Text>
       </Stack>
       <Stack gap={2}>
-        <SidebarItem
-          label="Overview"
-          active={activePageId === OVERVIEW_PAGE_ID}
-          onClick={() => onSelect(OVERVIEW_PAGE_ID)}
-        />
-        {surfaces.map((surface) => (
+        {tasks.map((task) => (
           <SidebarItem
-            key={surface.id}
-            label={surface.title}
-            active={activePageId === surface.id}
-            onClick={() => onSelect(surface.id)}
+            key={task.id}
+            label={displayTaskName(task)}
+            active={task.id === activeTaskId}
+            onClick={() => onSelect(task.id)}
           />
         ))}
       </Stack>
+      <Row>
+        <Button variant="ghost" onClick={onCreate}>
+          + New task
+        </Button>
+      </Row>
     </Stack>
   );
+}
+
+function displayTaskName(task: Task): string {
+  return task.name.trim() || NEW_TASK_NAME;
 }
 
 type SidebarItemProps = {
@@ -153,30 +343,171 @@ function SidebarItem({ label, active, onClick }: SidebarItemProps) {
   );
 }
 
-function OverviewPage({ onOpen }: { onOpen: (pageId: string) => void }) {
+function NoTasksPage({ onCreate }: { onCreate: () => void }) {
   return (
-    <Stack gap={24} style={{ maxWidth: 960 }}>
-      <Stack gap={8}>
-        <H1>Software Engineering Workbench</H1>
-        <Text size="small" tone="tertiary">
-          Each surface documents one part of this project. Data stays in this workspace.
-        </Text>
-      </Stack>
-      <Grid columns="repeat(auto-fill, minmax(280px, 1fr))" gap={16}>
+    <Stack gap={16} style={{ maxWidth: 960 }}>
+      <H1>Software Engineering Workbench</H1>
+      <Text size="small" tone="tertiary">
+        A task holds one feature specification with its UI elements and
+        functional elements. Data stays in this workspace.
+      </Text>
+      <Row>
+        <Button variant="primary" onClick={onCreate}>
+          + New task
+        </Button>
+      </Row>
+    </Stack>
+  );
+}
+
+type TaskPageProps = {
+  task: Task;
+  pageId: string;
+  spec: TaskSpec;
+  agentCells: AgentCells;
+  onSelectPage: (pageId: string) => void;
+  onRename: (name: string) => void;
+  onDelete: () => void;
+  onChangeSpec: (update: SpecUpdate) => void;
+};
+
+function TaskPage({
+  task,
+  pageId,
+  spec,
+  agentCells,
+  onSelectPage,
+  onRename,
+  onDelete,
+  onChangeSpec,
+}: TaskPageProps) {
+  const activeSurface = surfaces.find((surface) => surface.id === pageId);
+  return (
+    <Stack gap={24}>
+      <TaskHeader task={task} onRename={onRename} onDelete={onDelete} />
+      <TaskTabs activePageId={pageId} onSelect={onSelectPage} />
+      {activeSurface ? (
+        <activeSurface.Page
+          spec={spec}
+          agentCells={agentCells}
+          onChangeSpec={onChangeSpec}
+        />
+      ) : (
+        <OverviewTab onOpen={onSelectPage} />
+      )}
+    </Stack>
+  );
+}
+
+type TaskHeaderProps = {
+  task: Task;
+  onRename: (name: string) => void;
+  onDelete: () => void;
+};
+
+function TaskHeader({ task, onRename, onDelete }: TaskHeaderProps) {
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  return (
+    <Row gap={12} align="center" wrap>
+      <TextInput
+        value={task.name}
+        onChange={onRename}
+        placeholder="Task name"
+        style={{ width: TASK_NAME_MAX_WIDTH, maxWidth: "100%" }}
+      />
+      {confirmingDelete ? (
+        <Row gap={8} align="center" wrap>
+          <Text size="small" tone="secondary">
+            Delete this task and all its content?
+          </Text>
+          <Button variant="primary" onClick={onDelete}>
+            Delete
+          </Button>
+          <Button variant="ghost" onClick={() => setConfirmingDelete(false)}>
+            Cancel
+          </Button>
+        </Row>
+      ) : (
+        <Button variant="ghost" onClick={() => setConfirmingDelete(true)}>
+          Delete task
+        </Button>
+      )}
+    </Row>
+  );
+}
+
+type TaskTabsProps = {
+  activePageId: string;
+  onSelect: (pageId: string) => void;
+};
+
+function TaskTabs({ activePageId, onSelect }: TaskTabsProps) {
+  const theme = useHostTheme();
+  return (
+    <Row
+      gap={8}
+      wrap
+      style={{
+        paddingBottom: 12,
+        borderBottom: `1px solid ${theme.stroke.tertiary}`,
+      }}
+    >
+      <Pill
+        active={activePageId === OVERVIEW_PAGE_ID}
+        onClick={() => onSelect(OVERVIEW_PAGE_ID)}
+      >
+        Overview
+      </Pill>
+      {surfaces.map((surface) => (
+        <Pill
+          key={surface.id}
+          active={activePageId === surface.id}
+          onClick={() => onSelect(surface.id)}
+        >
+          {surface.title}
+        </Pill>
+      ))}
+    </Row>
+  );
+}
+
+function OverviewTab({ onOpen }: { onOpen: (pageId: string) => void }) {
+  return (
+    <Stack gap={16}>
+      <Text size="small" tone="tertiary">
+        Each tab documents one part of this task. Data stays in this workspace.
+      </Text>
+      <Grid columns={2} gap={12} align="stretch">
         {surfaces.map((surface) => (
-          <Card key={surface.id}>
+          <Card
+            key={surface.id}
+            style={{
+              height: "100%",
+              display: "flex",
+              flexDirection: "column",
+            }}
+          >
             <CardHeader>{surface.title}</CardHeader>
-            <CardBody>
-              <Stack gap={12}>
-                <Text size="small" tone="secondary">
-                  {surface.purpose}
-                </Text>
-                <Row>
-                  <Button variant="secondary" onClick={() => onOpen(surface.id)}>
-                    Open
-                  </Button>
-                </Row>
-              </Stack>
+            <CardBody
+              style={{
+                flex: 1,
+                display: "flex",
+                flexDirection: "column",
+                justifyContent: "space-between",
+                gap: 12,
+              }}
+            >
+              <Text size="small" tone="secondary">
+                {surface.purpose}
+              </Text>
+              <Row>
+                <Button
+                  variant="secondary"
+                  onClick={() => onOpen(surface.id)}
+                >
+                  Open
+                </Button>
+              </Row>
             </CardBody>
           </Card>
         ))}
@@ -185,17 +516,46 @@ function OverviewPage({ onOpen }: { onOpen: (pageId: string) => void }) {
   );
 }
 
+// Tasks need stable ids; names can change and repeat.
+function createTaskId(): string {
+  return `task-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+// MARK: - Architecture and Unit tests
+
+// These surfaces have a tab but no content format yet. They store nothing
+// until their format is decided.
+
+function ArchitecturePage() {
+  return <PlaceholderPage title="Architecture" />;
+}
+
+function UnitTestsPage() {
+  return <PlaceholderPage title="Unit tests" />;
+}
+
+function PlaceholderPage({ title }: { title: string }) {
+  return (
+    <Stack gap={8}>
+      <H2>{title}</H2>
+      <Text size="small" tone="tertiary">
+        The content format of this tab is not decided yet.
+      </Text>
+    </Stack>
+  );
+}
+
 // MARK: - Feature specification
 
-// Feature specification, UI elements, and Functional elements are three pages
-// over one data set. They share the `specColumns`, `specRows`, and
-// `agentCells` keys, each keyed by table id, so data saved before the split
-// still loads.
+// Feature specification, UI elements, and Functional elements are three tabs
+// over one task's data set. The task's `TaskSpec` holds `specColumns` and
+// `specRows` keyed by table id; `taskAgentCells[taskId]` holds the agent
+// output for the same tables.
 //
 // Column ownership (not a hard IDE lock; agents can still edit files):
 // - Edit (readOnly false): human. Never change those cell values.
-// - Read-only (readOnly true): agent. Write only into `agentCells`.
-// agentCells shape: tableId -> rowId -> columnId -> string
+// - Read-only (readOnly true): agent. Write only into `taskAgentCells`.
+// AgentCells shape: tableId -> rowId -> columnId -> string
 
 type ColumnKind = "text" | "code";
 
@@ -225,7 +585,8 @@ const CODE_CELL_MIN_ROWS = 4;
 const CODE_LINE_HEIGHT = 18;
 const CODE_PADDING = 8;
 const CODE_INDENT = "  ";
-const CODE_FONT_FAMILY = "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace";
+const CODE_FONT_FAMILY =
+  "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace";
 const CODE_FONT_SIZE = 12;
 
 const text = (id: string, name: string, readOnly = false): SpecColumn => ({
@@ -248,7 +609,9 @@ const featureSpecificationTables: TableMeta[] = [
   { id: "acceptance-criteria", title: "Acceptance criteria" },
 ];
 
-const uiElementsTables: TableMeta[] = [{ id: "ui-elements", title: "UI elements" }];
+const uiElementsTables: TableMeta[] = [
+  { id: "ui-elements", title: "UI elements" },
+];
 
 const functionalElementsTables: TableMeta[] = [
   { id: "functional-elements", title: "Functional elements" },
@@ -274,30 +637,34 @@ const seedColumns: Record<string, SpecColumn[]> = {
   ],
 };
 
-const seedRows: SpecRowsByTable = {
-  "user-stories": [],
-  "acceptance-criteria": [],
-  "ui-elements": [],
-  "functional-elements": [],
-};
-
-function FeatureSpecificationPage() {
-  const [featureName, setFeatureName] = useCanvasState("featureName", "");
+function FeatureSpecificationPage(props: SurfacePageProps) {
+  const setFeatureName = (featureName: string) =>
+    props.onChangeSpec((spec) => ({ ...spec, featureName }));
   return (
     <SpecPage
+      {...props}
       title="Feature specification"
       tables={featureSpecificationTables}
-      featureNameInput={{ value: featureName, onChange: setFeatureName }}
+      featureNameInput={{
+        value: props.spec.featureName,
+        onChange: setFeatureName,
+      }}
     />
   );
 }
 
-function UiElementsPage() {
-  return <SpecPage title="UI elements" tables={uiElementsTables} />;
+function UiElementsPage(props: SurfacePageProps) {
+  return <SpecPage {...props} title="UI elements" tables={uiElementsTables} />;
 }
 
-function FunctionalElementsPage() {
-  return <SpecPage title="Functional elements" tables={functionalElementsTables} />;
+function FunctionalElementsPage(props: SurfacePageProps) {
+  return (
+    <SpecPage
+      {...props}
+      title="Functional elements"
+      tables={functionalElementsTables}
+    />
+  );
 }
 
 type FeatureNameInput = {
@@ -305,37 +672,51 @@ type FeatureNameInput = {
   onChange: (value: string) => void;
 };
 
-type SpecPageProps = {
+type SpecPageProps = SurfacePageProps & {
   title: string;
   tables: TableMeta[];
   // Only the Feature specification page names the feature.
   featureNameInput?: FeatureNameInput;
 };
 
-function SpecPage({ title, tables, featureNameInput }: SpecPageProps) {
-  const [columnsByTable, setColumnsByTable] = useCanvasState("specColumns", seedColumns);
-  const [rowsByTable, setRowsByTable] = useCanvasState<SpecRowsByTable>("specRows", seedRows);
-  const [agentCells] = useCanvasState<AgentCells>("agentCells", {});
-
-  const updateRows = (tableId: string, update: (rows: SpecRow[]) => SpecRow[]) =>
-    setRowsByTable((previous) => ({
+function SpecPage({
+  title,
+  tables,
+  spec,
+  agentCells,
+  onChangeSpec,
+  featureNameInput,
+}: SpecPageProps) {
+  const updateRows = (
+    tableId: string,
+    update: (rows: SpecRow[]) => SpecRow[],
+  ) =>
+    onChangeSpec((previous) => ({
       ...previous,
-      [tableId]: update(previous[tableId] ?? []),
+      specRows: {
+        ...previous.specRows,
+        [tableId]: update(previous.specRows[tableId] ?? []),
+      },
     }));
 
   const updateColumns = (
     tableId: string,
     update: (columns: SpecColumn[]) => SpecColumn[],
   ) =>
-    setColumnsByTable((previous) => ({
+    onChangeSpec((previous) => ({
       ...previous,
-      [tableId]: update(previous[tableId] ?? seedColumns[tableId] ?? []),
+      specColumns: {
+        ...previous.specColumns,
+        [tableId]: update(
+          previous.specColumns[tableId] ?? seedColumns[tableId] ?? [],
+        ),
+      },
     }));
 
   return (
     <Stack gap={24} style={{ maxWidth: SPEC_PAGE_MAX_WIDTH }}>
       <Stack gap={8}>
-        <H1>{title}</H1>
+        <H2>{title}</H2>
         {featureNameInput && (
           <TextInput
             value={featureNameInput.value}
@@ -345,8 +726,9 @@ function SpecPage({ title, tables, featureNameInput }: SpecPageProps) {
           />
         )}
         <Text size="small" tone="tertiary">
-          Edits are saved automatically. Ask the agent to implement this specification.
-          Edit columns are human-owned. Read-only columns are agent-owned.
+          Edits are saved automatically. Ask the agent to implement this
+          specification. Edit columns are human-owned. Read-only columns are
+          agent-owned.
         </Text>
       </Stack>
 
@@ -356,8 +738,8 @@ function SpecPage({ title, tables, featureNameInput }: SpecPageProps) {
             key={table.id}
             tableId={table.id}
             title={table.title}
-            columns={columnsByTable[table.id] ?? seedColumns[table.id] ?? []}
-            rows={rowsByTable[table.id] ?? []}
+            columns={spec.specColumns[table.id] ?? seedColumns[table.id] ?? []}
+            rows={spec.specRows[table.id] ?? []}
             agentCells={agentCells}
             onChangeRows={(update) => updateRows(table.id, update)}
             onChangeColumns={(update) => updateColumns(table.id, update)}
@@ -391,13 +773,17 @@ function SpecTableSection({
     if (isReadOnlyColumn(columns[columnIndex])) return;
     onChangeRows((current) =>
       current.map((row) =>
-        row.id === rowId ? { ...row, cells: withCell(row.cells, columnIndex, value) } : row,
+        row.id === rowId
+          ? { ...row, cells: withCell(row.cells, columnIndex, value) }
+          : row,
       ),
     );
   };
 
   const setDone = (rowId: string, done: boolean) =>
-    onChangeRows((current) => current.map((row) => (row.id === rowId ? { ...row, done } : row)));
+    onChangeRows((current) =>
+      current.map((row) => (row.id === rowId ? { ...row, done } : row)),
+    );
 
   const deleteRow = (rowId: string) =>
     onChangeRows((current) => current.filter((row) => row.id !== rowId));
@@ -410,17 +796,23 @@ function SpecTableSection({
 
   const renameColumn = (columnId: string, name: string) =>
     onChangeColumns((current) =>
-      current.map((column) => (column.id === columnId ? { ...column, name } : column)),
+      current.map((column) =>
+        column.id === columnId ? { ...column, name } : column,
+      ),
     );
 
   const setColumnKind = (columnId: string, kind: ColumnKind) =>
     onChangeColumns((current) =>
-      current.map((column) => (column.id === columnId ? { ...column, kind } : column)),
+      current.map((column) =>
+        column.id === columnId ? { ...column, kind } : column,
+      ),
     );
 
   const setColumnReadOnly = (columnId: string, readOnly: boolean) =>
     onChangeColumns((current) =>
-      current.map((column) => (column.id === columnId ? { ...column, readOnly } : column)),
+      current.map((column) =>
+        column.id === columnId ? { ...column, readOnly } : column,
+      ),
     );
 
   const addColumn = (kind: ColumnKind) => {
@@ -435,15 +827,23 @@ function SpecTableSection({
       },
     ]);
     onChangeRows((current) =>
-      current.map((row) => ({ ...row, cells: insertCell(row.cells, index, "") })),
+      current.map((row) => ({
+        ...row,
+        cells: insertCell(row.cells, index, ""),
+      })),
     );
   };
 
   const deleteColumn = (columnIndex: number) => {
     if (columns.length <= 1) return;
-    onChangeColumns((current) => current.filter((_, index) => index !== columnIndex));
+    onChangeColumns((current) =>
+      current.filter((_, index) => index !== columnIndex),
+    );
     onChangeRows((current) =>
-      current.map((row) => ({ ...row, cells: removeCell(row.cells, columnIndex) })),
+      current.map((row) => ({
+        ...row,
+        cells: removeCell(row.cells, columnIndex),
+      })),
     );
   };
 
@@ -454,7 +854,11 @@ function SpecTableSection({
     onChangeRows((current) =>
       current.map((row) => ({
         ...row,
-        cells: swapItems(padCells(row.cells, columns.length), columnIndex, nextIndex),
+        cells: swapItems(
+          padCells(row.cells, columns.length),
+          columnIndex,
+          nextIndex,
+        ),
       })),
     );
   };
@@ -492,11 +896,17 @@ function SpecTableSection({
         onChange={(value) => editCell(row.id, columnIndex, value)}
       />
     )),
-    <IconButton key={`${row.id}-delete`} title="Delete row" onClick={() => deleteRow(row.id)}>
+    <IconButton
+      key={`${row.id}-delete`}
+      title="Delete row"
+      onClick={() => deleteRow(row.id)}
+    >
       ✕
     </IconButton>,
   ]);
-  const rowTone = rows.map((row) => (row.done === true ? "success" : undefined));
+  const rowTone = rows.map((row) =>
+    row.done === true ? "success" : undefined,
+  );
 
   return (
     <CollapsibleSection title={title} count={rows.length} defaultOpen>
@@ -566,13 +976,25 @@ function ColumnHeader({
           ]}
           style={{ minWidth: 92 }}
         />
-        <IconButton title="Move column left" disabled={!canMoveLeft} onClick={onMoveLeft}>
+        <IconButton
+          title="Move column left"
+          disabled={!canMoveLeft}
+          onClick={onMoveLeft}
+        >
           ←
         </IconButton>
-        <IconButton title="Move column right" disabled={!canMoveRight} onClick={onMoveRight}>
+        <IconButton
+          title="Move column right"
+          disabled={!canMoveRight}
+          onClick={onMoveRight}
+        >
           →
         </IconButton>
-        <IconButton title="Delete column" disabled={!canDelete} onClick={onDelete}>
+        <IconButton
+          title="Delete column"
+          disabled={!canDelete}
+          onClick={onDelete}
+        >
           ✕
         </IconButton>
       </Row>
@@ -802,62 +1224,64 @@ function TypeScriptCodeEditor({
           pointerEvents: readOnly ? "auto" : "none",
         }}
       >
-        {value
-          ? highlightTypeScript(value, colors)
-          : <span style={{ color: theme.text.quaternary }}>{placeholder}</span>}
+        {value ? (
+          highlightTypeScript(value, colors)
+        ) : (
+          <span style={{ color: theme.text.quaternary }}>{placeholder}</span>
+        )}
       </pre>
       {!readOnly && (
-      <textarea
-        value={value}
-        placeholder=""
-        spellCheck={false}
-        autoCapitalize="off"
-        autoComplete="off"
-        autoCorrect="off"
-        aria-label="TypeScript interface"
-        onChange={(event: { currentTarget: HTMLTextAreaElement }) =>
-          onChange(event.currentTarget.value)
-        }
-        onScroll={(event: { currentTarget: HTMLTextAreaElement }) => {
-          const overlay = overlayRef.current;
-          if (!overlay) return;
-          overlay.scrollTop = event.currentTarget.scrollTop;
-          overlay.scrollLeft = event.currentTarget.scrollLeft;
-        }}
-        onKeyDown={(event: {
-          key: string;
-          shiftKey: boolean;
-          preventDefault: () => void;
-          currentTarget: HTMLTextAreaElement;
-        }) => {
-          if (event.key !== "Tab") return;
-          event.preventDefault();
-          const result = applyTabIndent(
-            event.currentTarget.value,
-            event.currentTarget.selectionStart,
-            event.currentTarget.selectionEnd,
-            event.shiftKey,
-          );
-          onChange(result.value);
-          const textarea = event.currentTarget;
-          queueMicrotask(() => {
-            textarea.selectionStart = result.start;
-            textarea.selectionEnd = result.end;
-          });
-        }}
-        style={{
-          ...shared,
-          position: "relative",
-          display: "block",
-          color: "transparent",
-          caretColor: theme.text.primary,
-          background: "transparent",
-          border: "none",
-          outline: "none",
-          resize: "none",
-          WebkitTextFillColor: "transparent",
-        }}
-      />
+        <textarea
+          value={value}
+          placeholder=""
+          spellCheck={false}
+          autoCapitalize="off"
+          autoComplete="off"
+          autoCorrect="off"
+          aria-label="TypeScript interface"
+          onChange={(event: { currentTarget: HTMLTextAreaElement }) =>
+            onChange(event.currentTarget.value)
+          }
+          onScroll={(event: { currentTarget: HTMLTextAreaElement }) => {
+            const overlay = overlayRef.current;
+            if (!overlay) return;
+            overlay.scrollTop = event.currentTarget.scrollTop;
+            overlay.scrollLeft = event.currentTarget.scrollLeft;
+          }}
+          onKeyDown={(event: {
+            key: string;
+            shiftKey: boolean;
+            preventDefault: () => void;
+            currentTarget: HTMLTextAreaElement;
+          }) => {
+            if (event.key !== "Tab") return;
+            event.preventDefault();
+            const result = applyTabIndent(
+              event.currentTarget.value,
+              event.currentTarget.selectionStart,
+              event.currentTarget.selectionEnd,
+              event.shiftKey,
+            );
+            onChange(result.value);
+            const textarea = event.currentTarget;
+            queueMicrotask(() => {
+              textarea.selectionStart = result.start;
+              textarea.selectionEnd = result.end;
+            });
+          }}
+          style={{
+            ...shared,
+            position: "relative",
+            display: "block",
+            color: "transparent",
+            caretColor: theme.text.primary,
+            background: "transparent",
+            border: "none",
+            outline: "none",
+            resize: "none",
+            WebkitTextFillColor: "transparent",
+          }}
+        />
       )}
     </div>
   );
@@ -1069,13 +1493,15 @@ function applyTabIndent(
   unindent: boolean,
 ): { value: string; start: number; end: number } {
   if (!unindent && selectionStart === selectionEnd) {
-    const next = value.slice(0, selectionStart) + CODE_INDENT + value.slice(selectionEnd);
+    const next =
+      value.slice(0, selectionStart) + CODE_INDENT + value.slice(selectionEnd);
     const caret = selectionStart + CODE_INDENT.length;
     return { value: next, start: caret, end: caret };
   }
 
   const blockStart = value.lastIndexOf("\n", selectionStart - 1) + 1;
-  const endsOnLineStart = selectionEnd > selectionStart && value[selectionEnd - 1] === "\n";
+  const endsOnLineStart =
+    selectionEnd > selectionStart && value[selectionEnd - 1] === "\n";
   const lastChar = endsOnLineStart ? selectionEnd - 1 : selectionEnd;
   const newlineAfter = value.indexOf("\n", lastChar);
   const blockEnd = newlineAfter === -1 ? value.length : newlineAfter;
@@ -1109,7 +1535,8 @@ function applyDashToBullets(
   selectionEnd: number,
 ): { value: string; start: number; end: number } | null {
   const blockStart = value.lastIndexOf("\n", selectionStart - 1) + 1;
-  const endsOnLineStart = selectionEnd > selectionStart && value[selectionEnd - 1] === "\n";
+  const endsOnLineStart =
+    selectionEnd > selectionStart && value[selectionEnd - 1] === "\n";
   const lastChar = endsOnLineStart ? selectionEnd - 1 : selectionEnd;
   const newlineAfter = value.indexOf("\n", lastChar);
   const blockEnd = newlineAfter === -1 ? value.length : newlineAfter;
@@ -1152,12 +1579,18 @@ function displayCell(
   columnIndex: number,
 ): string {
   if (isReadOnlyColumn(column)) {
-    return agentCells[tableId]?.[row.id]?.[column.id] ?? row.cells[columnIndex] ?? "";
+    return (
+      agentCells[tableId]?.[row.id]?.[column.id] ?? row.cells[columnIndex] ?? ""
+    );
   }
   return row.cells[columnIndex] ?? "";
 }
 
-function withCell(cells: string[], columnIndex: number, value: string): string[] {
+function withCell(
+  cells: string[],
+  columnIndex: number,
+  value: string,
+): string[] {
   const padded = padCells(cells, columnIndex + 1);
   padded[columnIndex] = value;
   return padded;
@@ -1177,7 +1610,9 @@ function insertCell(cells: string[], index: number, value: string): string[] {
 }
 
 function removeCell(cells: string[], index: number): string[] {
-  return padCells(cells, index + 1).filter((_, cellIndex) => cellIndex !== index);
+  return padCells(cells, index + 1).filter(
+    (_, cellIndex) => cellIndex !== index,
+  );
 }
 
 function swapItems<T>(items: T[], from: number, to: number): T[] {

@@ -11,31 +11,46 @@ agents that use one surface inside a product workspace. Keep those jobs apart.
 
 The workbench is one Cursor canvas, `workbench.canvas.tsx`. A canvas is a
 single file with no relative imports, so every surface is a page inside that
-file. The hub is the sidebar and the Overview page. It lists the surfaces from
-the `surfaces` array and shows one page at a time. The open page is stored in
-the `hubPage` key.
+file. The hub is the sidebar and the task page. The sidebar lists tasks from
+the `tasks` key; the user creates, renames, and deletes them there and in the
+task header. The task page shows an Overview tab plus one tab per surface from
+the `surfaces` array. The open task is stored in `hubTask`, the open tab in
+`hubPage`.
 
-A surface is one page in the hub, an optional workspace rule for agents, and
+A surface is one tab in a task, an optional workspace rule for agents, and
 per-workspace data that stays local. All surfaces share
-`workbench.canvas.data.json`; each surface owns its own top-level keys.
+`workbench.canvas.data.json`. Surface data is keyed by task id: `taskSpecs`
+holds human-owned content, `taskAgentCells` holds agent output. Each surface
+owns its own tables inside those keys.
 
-| Surface               | Page component             | Workspace rule               | Status |
-| --------------------- | -------------------------- | ---------------------------- | ------ |
-| Feature specification | `FeatureSpecificationPage` | `rules/workbench-canvas.mdc` | Active |
-| UI elements           | `UiElementsPage`           | `rules/workbench-canvas.mdc` | Active |
-| Functional elements   | `FunctionalElementsPage`   | `rules/workbench-canvas.mdc` | Active |
+| Surface               | Page component             | Workspace rule               | Status      |
+| --------------------- | -------------------------- | ---------------------------- | ----------- |
+| Feature specification | `FeatureSpecificationPage` | `rules/workbench-canvas.mdc` | Active      |
+| Architecture          | `ArchitecturePage`         | none                         | Placeholder |
+| UI elements           | `UiElementsPage`           | `rules/workbench-canvas.mdc` | Active      |
+| Functional elements   | `FunctionalElementsPage`   | `rules/workbench-canvas.mdc` | Active      |
+| Unit tests            | `UnitTestsPage`            | none                         | Placeholder |
 
-Feature specification, UI elements, and Functional elements are three pages
-over one data set. They render `SpecPage` with different table lists and share
-the `specColumns`, `specRows`, and `agentCells` keys, each keyed by table id.
-They share one rule for the same reason. Data saved before the split loads
-unchanged.
+Placeholder surfaces have a tab and an Overview card but no content format and
+no data keys. Give them a format, tables, and a rule section before agents
+write to them.
+
+Feature specification, UI elements, and Functional elements are three tabs
+over one task's data set. They render `SpecPage` with different table lists
+and share the task's `TaskSpec` (`featureName`, `specColumns`, `specRows`) and
+`taskAgentCells[taskId]`, each keyed by table id. They share one rule for the
+same reason.
+
+The pre-task top-level keys `featureName`, `specColumns`, `specRows`, and
+`agentCells` are read by `useImportLegacySpec`. When `tasks` was never written
+and those keys hold content, the canvas creates one task from them. The old
+keys stay in the file.
 
 Planned kinds: architecture diagrams, test coverage catalogue, docs, CI/CD, and
 kinds the user adds later. Build a surface only when the user asks.
 
 Every surface has a stable `id`, a title, and a one-line purpose in the
-`surfaces` array. The Overview page renders those fields.
+`surfaces` array. The tab bar and the Overview tab render those fields.
 
 Distribution: `scripts/sync-workbench.py`, run by the user hook.
 Hook setup and the manual sync command are in `README.md`.
@@ -102,5 +117,6 @@ duplicate `README.md` setup steps in the manual; link to them.
 - New tables, columns, or surfaces do not require existing data files to gain
   keys.
 - No historical key is removed without a reader for the old name.
-- A stored `hubPage` that names no surface opens the Overview page.
-- A fresh workspace opens empty.
+- A stored `hubPage` that names no surface opens the Overview tab.
+- A stored `hubTask` that names no task opens the first task.
+- A fresh workspace opens empty, with no tasks.

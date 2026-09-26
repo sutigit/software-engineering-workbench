@@ -1,5 +1,5 @@
 ---
-description: Ownership of Workbench canvas data. Agent may write only Read-only columns of the spec pages.
+description: Ownership of Workbench canvas data. Agent may write only Read-only columns of the spec tabs.
 alwaysApply: true
 ---
 
@@ -7,39 +7,53 @@ alwaysApply: true
 
 The Workbench is the canvas `workbench.canvas.tsx` in this workspace canvases
 folder. Persisted data is `workbench.canvas.data.json` next to it. Do not
-change `hubPage`; it is the page the user has open.
+change `hubTask` or `hubPage`; they are the task and tab the user has open.
 
 Edit the canvas source in `~/Projects/software-engineering-workbench/`. A user hook copies
 that file into each workspace. Do not treat the workspace copy as the source.
 
-## Spec pages
+## Tasks
 
-Feature specification (tables `user-stories`, `acceptance-criteria`), UI
-elements (table `ui-elements`), and Functional elements (table
-`functional-elements`) share the keys below. Each key lives at the top level
-of the data file and is keyed by table id.
+The sidebar lists tasks. Each task has its own Feature specification (tables
+`user-stories`, `acceptance-criteria`), UI elements (table `ui-elements`), and
+Functional elements (table `functional-elements`) tabs.
+
+- `tasks` is the ordered list of `{ "id", "name" }`.
+- `taskSpecs.<taskId>` holds the human-owned spec of one task:
+  `featureName`, `specColumns`, and `specRows`, each keyed by table id.
+- `taskAgentCells.<taskId>` holds the agent output for the same task.
+
+Find a task by its `name` in `tasks` and use its `id` for the two other keys.
+When the user does not name a task, use the one in `hubTask`.
+
+The keys `featureName`, `specColumns`, `specRows`, and `agentCells` at the top
+level are from before tasks existed. The canvas imports them into one task on
+first load. Do not write to them.
 
 ### Human-owned (do not edit)
 
 Do not change these unless the user explicitly asks:
 
-- `featureName`
-- `specColumns` (names, kinds, order, `readOnly` flags)
-- `specRows` cell text for any column that is **not** Read-only
+- `tasks` (names, order, ids), add/delete task
+- `taskSpecs.<taskId>.featureName`
+- `taskSpecs.<taskId>.specColumns` (names, kinds, order, `readOnly` flags)
+- `taskSpecs.<taskId>.specRows` cell text for any column that is **not** Read-only
 - row ids, the Done checkbox, add/delete row or column
 
 A column is human-owned when `readOnly` is missing or `false` (the **Edit** pill).
 
 ### Agent-owned (write only here)
 
-Write generated cell values only in `agentCells`:
+Write generated cell values only in `taskAgentCells`:
 
 ```json
 {
-  "agentCells": {
-    "<tableId>": {
-      "<rowId>": {
-        "<columnId>": "generated text"
+  "taskAgentCells": {
+    "<taskId>": {
+      "<tableId>": {
+        "<rowId>": {
+          "<columnId>": "generated text"
+        }
       }
     }
   }

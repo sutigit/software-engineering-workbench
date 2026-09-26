@@ -21,12 +21,29 @@ command from `README.md`. Then run **Open Canvas** again.
 
 ## Hub
 
-The workbench opens with a sidebar on the left and a page on the right.
+The workbench opens with a sidebar on the left and a task page on the right.
 
-- The sidebar lists **Overview** and one entry per surface. Click an entry to
-  show that page. The workbench remembers the open page.
-- **Overview** shows one card per surface with its purpose. **Open** on a card
-  shows that surface.
+- The sidebar lists your **tasks**. Click a task to show it. The workbench
+  remembers the open task and tab.
+- A fresh workspace has no tasks. The page shows a **+ New task** button.
+
+## Tasks
+
+A task is one unit of work. It has a name and six tabs: **Overview**,
+**Feature specification**, **Architecture**, **UI elements**, **Functional
+elements**, and **Unit tests**. Each task has its own content in every tab.
+
+- **+ New task** at the bottom of the sidebar adds a task named
+  "Untitled task" and opens its Overview tab.
+- The **Task name** input at the top of the task page renames the task. The
+  sidebar shows the new name as you type.
+- **Delete task** next to the name asks "Delete this task and all its
+  content?". **Delete** removes the task and its tabs. **Cancel** keeps it.
+- The tab bar under the name switches between the six tabs.
+- **Overview** shows one card per tab in a two-column grid. **Open** on a
+  card shows that tab.
+- **Architecture** and **Unit tests** have no content format yet. Each shows
+  its title and a note. They store nothing.
 
 ## Where your data lives
 
@@ -38,13 +55,15 @@ uploaded.
 A fresh workspace opens empty.
 
 If you used the earlier standalone Feature specification canvas, the sync hook
-copies its data into the workbench file once. Your rows are kept.
+copies its data into the workbench file once. If the workbench had content
+before tasks existed, that content opens as a task named after its feature
+name, or "Imported task" when there was no feature name.
 
 ## Feature specification, UI elements, Functional elements
 
-These three pages together describe one feature that an agent implements.
-Open each from the sidebar or from its Overview card. Each page shows only its
-own tables. All three pages save into the same data file.
+These three tabs together describe one feature that an agent implements. Open
+each from the tab bar or from its Overview card. Each tab shows only its own
+tables. All three tabs save into the same task.
 
 - **Feature specification** has a **Feature name** input at the top and two
   tables: **User stories** and **Acceptance criteria**.
@@ -52,7 +71,7 @@ own tables. All three pages save into the same data file.
 - **Functional elements** has one table, **Functional elements**.
 
 Each table is a collapsible section with a row count. The sections below apply
-to every table on the three pages.
+to every table on the three tabs.
 
 ### Rows
 
@@ -100,9 +119,10 @@ Code cells:
 
 ### Work with the agent
 
-1. Fill the Edit columns on the three pages and mark which rows matter.
-2. Ask the agent to implement the specification.
-3. The agent reads your rows on all three pages and writes the Read-only
+1. Fill the Edit columns on the three tabs and mark which rows matter.
+2. Ask the agent to implement the specification. Name the task, or leave the
+   task open; the agent uses the open task by default.
+3. The agent reads your rows on all three tabs and writes the Read-only
    columns.
 4. Tick **Done** on rows that are complete.
 

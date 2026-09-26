@@ -3,8 +3,9 @@
 Source of Software Engineering Workbench. Agents that change this repo read
 `AGENTS.md` first. Usage instructions are in `USER-MANUAL.md`.
 
-The workbench is one Cursor canvas, `workbench.canvas.tsx`. It has a hub
-sidebar and one page per surface. The first surface is Feature specification.
+The workbench is one Cursor canvas, `workbench.canvas.tsx`. It has a sidebar
+of tasks and a task page with one tab per surface. The first surface is
+Feature specification.
 Edit `workbench.canvas.tsx` and `rules/workbench-canvas.mdc` in
 this repo. A user hook copies those files into each workspace.
 
