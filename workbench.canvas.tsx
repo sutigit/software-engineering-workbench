@@ -613,8 +613,8 @@ const uiElementsTables: TableMeta[] = [
   { id: "ui-elements", title: "UI elements" },
 ];
 
-const functionalElementsTables: TableMeta[] = [
-  { id: "functional-elements", title: "Functional elements" },
+const reactHooksTables: TableMeta[] = [
+  { id: "react-hooks", title: "React hooks" },
 ];
 
 const seedColumns: Record<string, SpecColumn[]> = {
@@ -627,7 +627,7 @@ const seedColumns: Record<string, SpecColumn[]> = {
     text("ui-parameters", "Parameters"),
     code("ui-interface", "Interface", true),
   ],
-  "functional-elements": [
+  "react-hooks": [
     text("fn-hook", "Hook"),
     text("fn-description", "Description"),
     text("fn-contract", "Contract"),
@@ -662,7 +662,7 @@ function FunctionalElementsPage(props: SurfacePageProps) {
     <SpecPage
       {...props}
       title="Functional elements"
-      tables={functionalElementsTables}
+      tables={reactHooksTables}
     />
   );
 }

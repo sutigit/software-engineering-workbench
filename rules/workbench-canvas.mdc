@@ -16,7 +16,7 @@ that file into each workspace. Do not treat the workspace copy as the source.
 
 The sidebar lists tasks. Each task has its own Feature specification (tables
 `user-stories`, `acceptance-criteria`), UI elements (table `ui-elements`), and
-Functional elements (table `functional-elements`) tabs.
+Functional elements (table `react-hooks`) tabs.
 
 - `tasks` is the ordered list of `{ "id", "name" }`.
 - `taskSpecs.<taskId>` holds the human-owned spec of one task:

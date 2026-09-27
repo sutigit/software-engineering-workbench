@@ -1,7 +1,9 @@
 # Software Engineering Workbench user manual
 
 How to open and use the workbench inside a Cursor workspace. Setup of the sync
-hook is in `README.md`. Rules for agents are in `AGENTS.md`.
+hook is in `README.md`. The rule that agents follow inside your workspace is
+`rules/workbench-canvas.mdc`. Instructions for agents that change the
+workbench itself are in `AGENTS.md`.
 
 ## Open the workbench
 
@@ -25,7 +27,8 @@ The workbench opens with a sidebar on the left and a task page on the right.
 
 - The sidebar lists your **tasks**. Click a task to show it. The workbench
   remembers the open task and tab.
-- A fresh workspace has no tasks. The page shows a **+ New task** button.
+- A fresh workspace has no tasks. The page shows the title, a short note, and
+  a **+ New task** button. The sidebar also has **+ New task**.
 
 ## Tasks
 
@@ -68,10 +71,25 @@ tables. All three tabs save into the same task.
 - **Feature specification** has a **Feature name** input at the top and two
   tables: **User stories** and **Acceptance criteria**.
 - **UI elements** has one table, **UI elements**.
-- **Functional elements** has one table, **Functional elements**.
+- **Functional elements** has one table, **React hooks**.
 
-Each table is a collapsible section with a row count. The sections below apply
-to every table on the three tabs.
+Each table is a collapsible section with a row count. An empty table shows
+"No rows yet." The sections below apply to every table on the three tabs.
+
+### Default columns
+
+A new task starts with these columns. You can rename, move, add, or delete
+them.
+
+| Table               | Columns                                                          |
+| ------------------- | ---------------------------------------------------------------- |
+| User stories        | Story                                                            |
+| Acceptance criteria | Criterion                                                        |
+| UI elements         | UI element, Description, Contract, Parameters, Interface (code)  |
+| React hooks         | Hook, Description, Contract, Input, Output, Interface (code)     |
+
+Every column is a Text column and Edit, except **Interface**, which is a Code
+column and Read-only.
 
 ### Rows
 
@@ -90,7 +108,8 @@ Each column header has:
 - Two pills: **Edit** and **Read-only**.
 
 **+ Add text column** and **+ Add code column** add a column to the table. A
-new code column is named "Interface" and starts as Read-only.
+new text column is named "Column" and starts as Edit. A new code column is
+named "Interface" and starts as Read-only.
 
 ### Edit vs Read-only
 
@@ -107,13 +126,18 @@ Text cells:
 
 - Cells grow with their content.
 - Press `Tab` on a line that starts with `-` to turn it into a `•` bullet.
-  Select several lines to convert them at once.
+  Select several lines to convert them at once. Lines that start with `--`
+  do not change.
+- Read-only text cells show "The agent writes this column." until the agent
+  fills them.
 
 Code cells:
 
 - TypeScript syntax highlighting.
 - `Tab` inserts two spaces. With a selection, `Tab` indents the selected
   lines. `Shift+Tab` unindents them.
+- An empty Edit code cell shows an `interface` skeleton named after the
+  column as a hint.
 - Read-only code cells show "The agent writes this interface." until the agent
   fills them.
 
