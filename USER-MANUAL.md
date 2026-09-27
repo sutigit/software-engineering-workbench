@@ -46,8 +46,6 @@ content in every tab.
 - The tab bar under the name switches between the seven tabs.
 - **Overview** shows one card per tab in a two-column grid. **Open** on a
   card shows that tab.
-- **Unit tests** and **Integration tests** have no content format yet. Each
-  shows its title and a note. They store nothing.
 
 ## Where your data lives
 
@@ -63,37 +61,41 @@ copies its data into the workbench file once. If the workbench had content
 before tasks existed, that content opens as a task named after its feature
 name, or "Imported task" when there was no feature name.
 
-## Feature specification, UI elements, Functional elements
+## Spec and test tables
 
-These three tabs together describe one feature that an agent implements. Open
-each from the tab bar or from its Overview card. Each tab shows only its own
-tables. All three tabs save into the same task.
+These tabs together describe one feature that an agent implements. Open each
+from the tab bar or from its Overview card. Each tab shows only its own
+tables. All of them save into the same task.
 
 - **Feature specification** has a **Feature name** input at the top and four
   tables in this order: **User stories**, **Acceptance criteria**,
   **Functional requirements**, and **Non-functional requirements**.
 - **UI elements** has one table, **UI elements**.
 - **Functional elements** has one table, **React hooks**.
+- **Unit tests** has one table, **Unit tests**.
+- **Integration tests** has one table, **Integration tests**.
 
 Each table is a collapsible section with a row count and a **?** icon at the
 right of its header. Hover or focus the icon to read what the table is for.
 Clicking the icon does not collapse the section. An empty
-table shows "No rows yet." The sections below apply to every table on the
-three tabs.
+table shows "No rows yet." The sections below apply to every table on these
+tabs.
 
 ### Default columns
 
 A new task starts with these columns. You can rename, move, add, or delete
 them.
 
-| Table                       | Columns                                                          |
-| --------------------------- | ---------------------------------------------------------------- |
-| User stories                | Story                                                            |
-| Acceptance criteria         | Criterion                                                        |
-| Functional requirements     | Requirement                                                      |
-| Non-functional requirements | Requirement                                                      |
-| UI elements                 | UI element, Description, Contract, Parameters, Interface (code)  |
-| React hooks                 | Hook, Description, Contract, Input, Output, Interface (code)     |
+| Table                       | Columns                                                         |
+| --------------------------- | --------------------------------------------------------------- |
+| User stories                | Story                                                           |
+| Acceptance criteria         | Criterion                                                       |
+| Functional requirements     | Requirement                                                     |
+| Non-functional requirements | Requirement                                                     |
+| UI elements                 | UI element, Description, Contract, Parameters, Interface (code) |
+| React hooks                 | Hook, Description, Contract, Input, Output, Interface (code)    |
+| Unit tests                  | Components, Description                                         |
+| Integration tests           | Components, Description                                         |
 
 Every column is a Text column and Edit, except **Interface**, which is a Code
 column and Read-only.
@@ -120,7 +122,12 @@ named "Interface" and starts as Read-only.
 
 ### Edit vs Read-only
 
-- **Edit** columns are yours. Agents do not change them.
+- **Edit** columns are yours on Feature specification, UI elements, and
+  Functional elements. Agents do not change them there.
+- On **Unit tests** and **Integration tests**, you and the agent may both
+  write the Edit columns. The **Components** column names the code-level
+  parts under test. The **Description** column states what to check, in
+  plain English, with no test-framework names.
 - **Read-only** columns belong to the agent. You cannot type in them. The
   agent fills them when you ask it to implement the spec. A column named
   "Interface" is agent-owned even when the pill is not set.
@@ -150,12 +157,15 @@ Code cells:
 
 ### Work with the agent
 
-1. Fill the Edit columns on the three tabs and mark which rows matter.
-2. Ask the agent to implement the specification. Name the task, or leave the
+1. Fill the Edit columns on Feature specification, UI elements, and
+   Functional elements, and mark which rows matter.
+2. Fill Unit tests and Integration tests, or ask the agent to add those rows.
+3. Ask the agent to implement the specification. Name the task, or leave the
    task open; the agent uses the open task by default.
-3. The agent reads your rows on all three tabs and writes the Read-only
-   columns.
-4. Tick **Done** on rows that are complete.
+4. The agent reads your rows on these tabs and writes the Read-only columns.
+   When it writes tests, it follows each Description and does not tie that
+   text to a test framework.
+5. Tick **Done** on rows that are complete.
 
 ## Architecture
 

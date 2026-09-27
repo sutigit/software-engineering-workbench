@@ -24,24 +24,20 @@ holds human-owned content, `taskAgentCells` holds agent output, and
 `taskArchitecture` holds the mermaid diagrams of the Architecture surface.
 Each spec surface owns its own tables inside `taskSpecs` and `taskAgentCells`.
 
-| Surface               | Page component             | Workspace rule               | Status      |
-| --------------------- | -------------------------- | ---------------------------- | ----------- |
-| Feature specification | `FeatureSpecificationPage` | `rules/workbench-canvas.mdc` | Active      |
-| Architecture          | `ArchitecturePage`         | `rules/workbench-canvas.mdc` | Active      |
-| UI elements           | `UiElementsPage`           | `rules/workbench-canvas.mdc` | Active      |
-| Functional elements   | `FunctionalElementsPage`   | `rules/workbench-canvas.mdc` | Active      |
-| Unit tests            | `UnitTestsPage`            | none                         | Placeholder |
-| Integration tests     | `IntegrationTestsPage`     | none                         | Placeholder |
+| Surface               | Page component             | Workspace rule               | Status |
+| --------------------- | -------------------------- | ---------------------------- | ------ |
+| Feature specification | `FeatureSpecificationPage` | `rules/workbench-canvas.mdc` | Active |
+| Architecture          | `ArchitecturePage`         | `rules/workbench-canvas.mdc` | Active |
+| UI elements           | `UiElementsPage`           | `rules/workbench-canvas.mdc` | Active |
+| Functional elements   | `FunctionalElementsPage`   | `rules/workbench-canvas.mdc` | Active |
+| Unit tests            | `UnitTestsPage`            | `rules/workbench-canvas.mdc` | Active |
+| Integration tests     | `IntegrationTestsPage`     | `rules/workbench-canvas.mdc` | Active |
 
-Placeholder surfaces have a tab and an Overview card but no content format and
-no data keys. Give them a format, tables, and a rule section before agents
-write to them.
-
-Feature specification, UI elements, and Functional elements are three tabs
-over one task's data set. They render `SpecPage` with different table lists
-and share the task's `TaskSpec` (`featureName`, `specColumns`, `specRows`) and
-`taskAgentCells[taskId]`, each keyed by table id. They share one rule for the
-same reason.
+Feature specification, UI elements, Functional elements, Unit tests, and
+Integration tests are tabs over one task's data set. They render `SpecPage`
+with different table lists and share the task's `TaskSpec` (`featureName`,
+`specColumns`, `specRows`) and `taskAgentCells[taskId]`, each keyed by table
+id. They share one rule for the same reason.
 
 Architecture stores a list of `ArchitectureDiagram` per task in
 `taskArchitecture[taskId]`. The canvas never renders mermaid.

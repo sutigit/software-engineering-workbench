@@ -1,5 +1,5 @@
 ---
-description: Ownership of Workbench canvas data. Agent may write only Read-only columns of the spec tabs and the mermaid source of Architecture diagrams.
+description: Ownership of Workbench canvas data. Agent may write Read-only spec columns, Unit tests and Integration tests Edit cells, and Architecture mermaid source.
 alwaysApply: true
 ---
 
@@ -17,7 +17,8 @@ that file into each workspace. Do not treat the workspace copy as the source.
 The sidebar lists tasks. Each task has its own Feature specification (tables
 `user-stories`, `acceptance-criteria`, `functional-requirements`,
 `non-functional-requirements`), Architecture (mermaid diagrams), UI elements
-(table `ui-elements`), and Functional elements (table `react-hooks`) tabs.
+(table `ui-elements`), Functional elements (table `react-hooks`), Unit tests
+(table `unit-tests`), and Integration tests (table `integration-tests`) tabs.
 
 - `tasks` is the ordered list of `{ "id", "name" }`.
 - `taskSpecs.<taskId>` holds the human-owned spec of one task:
@@ -39,8 +40,10 @@ Do not change these unless the user explicitly asks:
 - `tasks` (names, order, ids), add/delete task
 - `taskSpecs.<taskId>.featureName`
 - `taskSpecs.<taskId>.specColumns` (names, kinds, order, `readOnly` flags)
-- `taskSpecs.<taskId>.specRows` cell text for any column that is **not** Read-only
-- row ids, the Done checkbox, add/delete row or column
+- `taskSpecs.<taskId>.specRows` cell text for any column that is **not** Read-only,
+  except tables `unit-tests` and `integration-tests` (see below)
+- row ids, the Done checkbox, add/delete row or column, except you may add
+  rows on `unit-tests` and `integration-tests`
 
 A column is human-owned when `readOnly` is missing or `false` (the **Edit** pill).
 
@@ -66,6 +69,32 @@ Write only for columns with `readOnly: true` (the **Read-only** pill), or whose
 name is `Interface` when `readOnly` is omitted.
 
 You may **read** human-owned cells to implement the spec. You must not rewrite them.
+
+## Unit tests and Integration tests
+
+Tables `unit-tests` and `integration-tests` live in the same `taskSpecs` and
+`taskAgentCells` maps as the other spec tables.
+
+Default columns are **Edit** text: `Components` then `Description`. The Done
+checkbox is part of the row, not a stored column.
+
+These Edit columns are shared. You and the user may both write them in
+`taskSpecs.<taskId>.specRows`:
+
+- You may add rows. Give each row an id of the form `row-<unique>`,
+  `done: false`, and a `cells` array that matches the column order.
+- Write **Components** as the code-level parts under test, in plain text.
+- Write **Description** as what must be true, in plain English. Do not name
+  a test framework, runner, or assertion library. When you later write the
+  test files, follow that description and use the stack the project already
+  uses.
+- Do not overwrite a cell the user already filled unless the user asks.
+- Do not change `specColumns`, row ids, or the Done checkbox unless the user
+  asks.
+- Do not delete rows unless the user asks.
+
+If a column on these tables is **Read-only**, write it in `taskAgentCells`
+like any other agent-owned column.
 
 ## Architecture
 

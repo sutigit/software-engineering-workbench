@@ -11,22 +11,22 @@ task holds its own content for every surface.
 
 Surfaces and their status:
 
-| Surface               | Status      | Content                                                                                               |
-| --------------------- | ----------- | ----------------------------------------------------------------------------------------------------- |
-| Feature specification | Active      | Feature name, User stories, Acceptance criteria, Functional requirements, Non-functional requirements |
-| Architecture          | Active      | Mermaid diagrams, rendered to SVG by `scripts/render-architecture.mjs`                                |
-| UI elements           | Active      | UI elements table                                                                                     |
-| Functional elements   | Active      | React hooks table                                                                                     |
-| Unit tests            | Placeholder | No content format yet                                                                                 |
-| Integration tests     | Placeholder | No content format yet                                                                                 |
+| Surface               | Status | Content                                                                                               |
+| --------------------- | ------ | ----------------------------------------------------------------------------------------------------- |
+| Feature specification | Active | Feature name, User stories, Acceptance criteria, Functional requirements, Non-functional requirements |
+| Architecture          | Active | Mermaid diagrams, rendered to SVG by `scripts/render-architecture.mjs`                                |
+| UI elements           | Active | UI elements table                                                                                     |
+| Functional elements   | Active | React hooks table                                                                                     |
+| Unit tests            | Active | Unit tests table: Components, Description                                                             |
+| Integration tests     | Active | Integration tests table: Components, Description                                                      |
 
-The three spec surfaces are editable tables. Each column is either **Edit**
-(human-owned) or **Read-only** (agent-owned). The agent fills Read-only
-columns when asked to implement the spec. Architecture is a list of mermaid
-diagrams; the agent runs the render script so the stored SVG matches the
-mermaid source. Ownership rules for agents are in
-`rules/workbench-canvas.mdc`. Placeholder surfaces show a tab and a note and
-store nothing.
+The spec and test surfaces are editable tables. Each column is either **Edit**
+(the user can type) or **Read-only** (the agent writes into `taskAgentCells`).
+The agent fills Read-only columns when asked to implement the spec. On Unit
+tests and Integration tests, Edit columns may also be written by the agent in
+`specRows`. Architecture is a list of mermaid diagrams; the agent runs the
+render script so the stored SVG matches the mermaid source. Ownership rules
+for agents are in `rules/workbench-canvas.mdc`.
 
 ## Setup
 

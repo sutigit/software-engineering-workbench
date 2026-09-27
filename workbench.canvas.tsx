@@ -520,10 +520,7 @@ function OverviewTab({ onOpen }: { onOpen: (pageId: string) => void }) {
                 {surface.purpose}
               </Text>
               <Row>
-                <Button
-                  variant="secondary"
-                  onClick={() => onOpen(surface.id)}
-                >
+                <Button variant="secondary" onClick={() => onOpen(surface.id)}>
                   Open
                 </Button>
               </Row>
@@ -538,30 +535,6 @@ function OverviewTab({ onOpen }: { onOpen: (pageId: string) => void }) {
 // Tasks need stable ids; names can change and repeat.
 function createTaskId(): string {
   return `task-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
-}
-
-// MARK: - Unit tests and Integration tests
-
-// These surfaces have a tab but no content format yet. They store nothing
-// until their format is decided.
-
-function UnitTestsPage() {
-  return <PlaceholderPage title="Unit tests" />;
-}
-
-function IntegrationTestsPage() {
-  return <PlaceholderPage title="Integration tests" />;
-}
-
-function PlaceholderPage({ title }: { title: string }) {
-  return (
-    <Stack gap={8}>
-      <H2>{title}</H2>
-      <Text size="small" tone="tertiary">
-        The content format of this tab is not decided yet.
-      </Text>
-    </Stack>
-  );
 }
 
 // MARK: - Architecture
@@ -832,10 +805,10 @@ function createDiagramId(): string {
 
 // MARK: - Feature specification
 
-// Feature specification, UI elements, and Functional elements are three tabs
-// over one task's data set. The task's `TaskSpec` holds `specColumns` and
-// `specRows` keyed by table id; `taskAgentCells[taskId]` holds the agent
-// output for the same tables.
+// Feature specification, UI elements, Functional elements, Unit tests, and
+// Integration tests are tabs over one task's data set. The task's `TaskSpec`
+// holds `specColumns` and `specRows` keyed by table id; `taskAgentCells[taskId]`
+// holds the agent output for the same tables.
 //
 // Column ownership (not a hard IDE lock; agents can still edit files):
 // - Edit (readOnly false): human. Never change those cell values.
@@ -876,6 +849,15 @@ const CODE_FONT_SIZE = 12;
 const HELP_ICON_SIZE = 16;
 const HELP_POPOVER_WIDTH = 280;
 
+const SPEC_PAGE_INTRO =
+  "Edits are saved automatically. Ask the agent to implement this " +
+  "specification. Edit columns are human-owned. Read-only columns are " +
+  "agent-owned.";
+
+const TEST_PAGE_INTRO =
+  "Edits are saved automatically. You or the agent can fill each row. " +
+  "Write the description in plain English, with no test-framework names.";
+
 const text = (id: string, name: string, readOnly = false): SpecColumn => ({
   id,
   name,
@@ -898,7 +880,7 @@ const featureSpecificationTables: TableMeta[] = [
     title: "User stories",
     description:
       "Short statements of what a user wants and why, written from the " +
-      "user's view (\"As a …, I want …, so that …\"). They define the scope " +
+      'user\'s view ("As a …, I want …, so that …"). They define the scope ' +
       "and value of the feature, not the design.",
   },
   {
@@ -947,6 +929,28 @@ const reactHooksTables: TableMeta[] = [
   },
 ];
 
+const unitTestsTables: TableMeta[] = [
+  {
+    id: "unit-tests",
+    title: "Unit tests",
+    description:
+      "Checks of one unit in isolation. Name the code-level components " +
+      "under test, then state in plain English what must be true. Do not " +
+      "name a test framework.",
+  },
+];
+
+const integrationTestsTables: TableMeta[] = [
+  {
+    id: "integration-tests",
+    title: "Integration tests",
+    description:
+      "Checks of how units work together. Name the code-level components " +
+      "under test, then state in plain English what must be true. Do not " +
+      "name a test framework.",
+  },
+];
+
 const seedColumns: Record<string, SpecColumn[]> = {
   "user-stories": [text("us-story", "Story")],
   "acceptance-criteria": [text("ac-criterion", "Criterion")],
@@ -966,6 +970,16 @@ const seedColumns: Record<string, SpecColumn[]> = {
     text("fn-input", "Input"),
     text("fn-output", "Output"),
     code("fn-interface", "Interface", true),
+  ],
+  // Components is free text for now. A later column will pick known UI
+  // elements and functional elements from this workspace.
+  "unit-tests": [
+    text("ut-components", "Components"),
+    text("ut-description", "Description"),
+  ],
+  "integration-tests": [
+    text("it-components", "Components"),
+    text("it-description", "Description"),
   ],
 };
 
@@ -999,6 +1013,28 @@ function FunctionalElementsPage(props: SurfacePageProps) {
   );
 }
 
+function UnitTestsPage(props: SurfacePageProps) {
+  return (
+    <SpecPage
+      {...props}
+      title="Unit tests"
+      tables={unitTestsTables}
+      intro={TEST_PAGE_INTRO}
+    />
+  );
+}
+
+function IntegrationTestsPage(props: SurfacePageProps) {
+  return (
+    <SpecPage
+      {...props}
+      title="Integration tests"
+      tables={integrationTestsTables}
+      intro={TEST_PAGE_INTRO}
+    />
+  );
+}
+
 type FeatureNameInput = {
   value: string;
   onChange: (value: string) => void;
@@ -1009,6 +1045,7 @@ type SpecPageProps = SurfacePageProps & {
   tables: TableMeta[];
   // Only the Feature specification page names the feature.
   featureNameInput?: FeatureNameInput;
+  intro?: string;
 };
 
 function SpecPage({
@@ -1018,6 +1055,7 @@ function SpecPage({
   agentCells,
   onChangeSpec,
   featureNameInput,
+  intro = SPEC_PAGE_INTRO,
 }: SpecPageProps) {
   const updateRows = (
     tableId: string,
@@ -1058,9 +1096,7 @@ function SpecPage({
           />
         )}
         <Text size="small" tone="tertiary">
-          Edits are saved automatically. Ask the agent to implement this
-          specification. Edit columns are human-owned. Read-only columns are
-          agent-owned.
+          {intro}
         </Text>
       </Stack>
 
