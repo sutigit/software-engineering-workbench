@@ -24,7 +24,6 @@ import {
   useRef,
   useState,
   type CSSProperties,
-  type SetCanvasState,
 } from "cursor/canvas";
 
 // MARK: - Hub
@@ -39,18 +38,11 @@ const PAGE_PADDING = 24;
 const TASK_NAME_MAX_WIDTH = 360;
 const NEW_TASK_NAME = "Untitled task";
 
-// Spec data saved before tasks existed lives in top-level keys. It becomes
-// this task the first time the canvas opens with the new schema.
-const IMPORTED_TASK_ID = "task-imported";
-const IMPORTED_TASK_NAME = "Imported task";
-
 type Task = {
   id: string;
   name: string;
 };
 
-// Spec content of one task. Inner shapes match the pre-task top-level keys
-// `featureName`, `specColumns`, and `specRows`.
 type TaskSpec = {
   featureName: string;
   specColumns: Record<string, SpecColumn[]>;
@@ -58,7 +50,6 @@ type TaskSpec = {
 };
 
 type TaskSpecsById = Record<string, TaskSpec>;
-type TaskAgentCellsById = Record<string, AgentCells>;
 type TaskArchitectureById = Record<string, ArchitectureDiagram[]>;
 
 type SpecUpdate = (spec: TaskSpec) => TaskSpec;
@@ -71,7 +62,6 @@ type DiagramsUpdate = (
 type SurfacePageProps = {
   task: Task;
   spec: TaskSpec;
-  agentCells: AgentCells;
   onChangeSpec: (update: SpecUpdate) => void;
   diagrams: ArchitectureDiagram[];
   onChangeDiagrams: (update: DiagramsUpdate) => void;
@@ -126,15 +116,11 @@ const surfaces: Surface[] = [
 ];
 
 export default function WorkbenchCanvas() {
-  // `null` means the key was never written, which is what the legacy import
-  // checks. An empty array means the user deleted every task.
-  const [storedTasks, setTasks] = useCanvasState<Task[] | null>("tasks", null);
+  const [tasks, setTasks] = useCanvasState<Task[]>("tasks", []);
   const [taskSpecs, setTaskSpecs] = useCanvasState<TaskSpecsById>(
     "taskSpecs",
     {},
   );
-  const [taskAgentCells, setTaskAgentCells] =
-    useCanvasState<TaskAgentCellsById>("taskAgentCells", {});
   const [taskArchitecture, setTaskArchitecture] =
     useCanvasState<TaskArchitectureById>("taskArchitecture", {});
   const [storedTaskId, setTaskId] = useCanvasState<string>("hubTask", "");
@@ -142,14 +128,6 @@ export default function WorkbenchCanvas() {
     "hubPage",
     OVERVIEW_PAGE_ID,
   );
-
-  useImportLegacySpec(storedTasks, {
-    setTasks,
-    setTaskSpecs,
-    setTaskAgentCells,
-  });
-
-  const tasks = storedTasks ?? [];
   // A stored id can point at a task or surface that no longer exists.
   const activeTask = tasks.find((task) => task.id === storedTaskId) ?? tasks[0];
   const activeSurface = surfaces.find((surface) => surface.id === storedPageId);
@@ -157,24 +135,23 @@ export default function WorkbenchCanvas() {
 
   const createTask = () => {
     const task: Task = { id: createTaskId(), name: NEW_TASK_NAME };
-    setTasks((previous) => [...(previous ?? []), task]);
+    setTasks((previous) => [...previous, task]);
     setTaskId(task.id);
     setPageId(OVERVIEW_PAGE_ID);
   };
 
   const renameTask = (taskId: string, name: string) =>
     setTasks((previous) =>
-      (previous ?? []).map((task) =>
+      previous.map((task) =>
         task.id === taskId ? { ...task, name } : task,
       ),
     );
 
   const deleteTask = (taskId: string) => {
     setTasks((previous) =>
-      (previous ?? []).filter((task) => task.id !== taskId),
+      previous.filter((task) => task.id !== taskId),
     );
     setTaskSpecs((previous) => withoutKey(previous, taskId));
-    setTaskAgentCells((previous) => withoutKey(previous, taskId));
     setTaskArchitecture((previous) => withoutKey(previous, taskId));
   };
 
@@ -207,7 +184,6 @@ export default function WorkbenchCanvas() {
             task={activeTask}
             pageId={pageId}
             spec={normalizeTaskSpec(taskSpecs[activeTask.id])}
-            agentCells={taskAgentCells[activeTask.id] ?? {}}
             diagrams={normalizeDiagrams(taskArchitecture[activeTask.id])}
             onSelectPage={setPageId}
             onRename={(name) => renameTask(activeTask.id, name)}
@@ -223,55 +199,6 @@ export default function WorkbenchCanvas() {
   );
 }
 
-type LegacyImportSetters = {
-  setTasks: SetCanvasState<Task[] | null>;
-  setTaskSpecs: SetCanvasState<TaskSpecsById>;
-  setTaskAgentCells: SetCanvasState<TaskAgentCellsById>;
-};
-
-// Reads the pre-task top-level keys and moves their content into one task.
-// Runs once: only while `tasks` has never been written. The old keys stay in
-// the data file untouched.
-function useImportLegacySpec(
-  storedTasks: Task[] | null,
-  setters: LegacyImportSetters,
-) {
-  const [featureName] = useCanvasState<string>("featureName", "");
-  const [specColumns] = useCanvasState<Record<string, SpecColumn[]>>(
-    "specColumns",
-    {},
-  );
-  const [specRows] = useCanvasState<SpecRowsByTable>("specRows", {});
-  const [agentCells] = useCanvasState<AgentCells>("agentCells", {});
-
-  useEffect(() => {
-    if (storedTasks !== null) return;
-    if (!hasLegacySpecContent(featureName, specRows)) return;
-    setters.setTasks(() => [
-      { id: IMPORTED_TASK_ID, name: featureName.trim() || IMPORTED_TASK_NAME },
-    ]);
-    setters.setTaskSpecs((previous) => ({
-      ...previous,
-      [IMPORTED_TASK_ID]: { featureName, specColumns, specRows },
-    }));
-    setters.setTaskAgentCells((previous) => ({
-      ...previous,
-      [IMPORTED_TASK_ID]: agentCells,
-    }));
-  }, [storedTasks, featureName, specColumns, specRows, agentCells]);
-}
-
-function hasLegacySpecContent(
-  featureName: string,
-  specRows: SpecRowsByTable,
-): boolean {
-  if (featureName.trim() !== "") return true;
-  return Object.values(specRows).some(
-    (rows) => Array.isArray(rows) && rows.length > 0,
-  );
-}
-
-// A stored spec can predate a field. Missing fields read as empty.
 function normalizeTaskSpec(spec: Partial<TaskSpec> | undefined): TaskSpec {
   return {
     featureName: spec?.featureName ?? "",
@@ -807,13 +734,8 @@ function createDiagramId(): string {
 
 // Feature specification, UI elements, Functional elements, Unit tests, and
 // Integration tests are tabs over one task's data set. The task's `TaskSpec`
-// holds `specColumns` and `specRows` keyed by table id; `taskAgentCells[taskId]`
-// holds the agent output for the same tables.
-//
-// Column ownership (not a hard IDE lock; agents can still edit files):
-// - Edit (readOnly false): human. Never change those cell values.
-// - Read-only (readOnly true): agent. Write only into `taskAgentCells`.
-// AgentCells shape: tableId -> rowId -> columnId -> string
+// holds `specColumns` and `specRows` keyed by table id. The user types in the
+// canvas and the agent writes the same `specRows`.
 
 type ColumnKind = "text" | "code" | "selection" | "multi-selection";
 
@@ -826,11 +748,7 @@ type SpecColumn = {
   id: string;
   name: string;
   kind: ColumnKind;
-  // When true, the user cannot edit cells. The agent writes this column.
-  readOnly: boolean;
 };
-
-type AgentCells = Record<string, Record<string, Record<string, string>>>;
 
 type SpecRow = {
   id: string;
@@ -860,25 +778,22 @@ const HELP_ICON_SIZE = 16;
 const HELP_POPOVER_WIDTH = 280;
 
 const SPEC_PAGE_INTRO =
-  "Edits are saved automatically. Ask the agent to implement this " +
-  "specification. Edit columns are human-owned. Read-only columns are " +
-  "agent-owned.";
+  "Edits are saved automatically. You or the agent can fill any cell. " +
+  "Ask the agent to implement this specification.";
 
 const TEST_PAGE_INTRO =
   "Edits are saved automatically. You or the agent can fill each row. " +
   "Write the description in plain English, with no test-framework names.";
 
-const text = (id: string, name: string, readOnly = false): SpecColumn => ({
+const text = (id: string, name: string): SpecColumn => ({
   id,
   name,
   kind: "text",
-  readOnly,
 });
-const code = (id: string, name: string, readOnly = false): SpecColumn => ({
+const code = (id: string, name: string): SpecColumn => ({
   id,
   name,
   kind: "code",
-  readOnly,
 });
 
 // `description` is the hover tooltip on the help icon in the section header.
@@ -990,7 +905,7 @@ const seedColumns: Record<string, SpecColumn[]> = {
     text("ui-description", "Description"),
     text("ui-contract", "Contract"),
     text("ui-parameters", "Parameters"),
-    code("ui-interface", "Interface", true),
+    code("ui-interface", "Interface"),
   ],
   "react-hooks": [
     text("fn-hook", "Hook"),
@@ -998,7 +913,7 @@ const seedColumns: Record<string, SpecColumn[]> = {
     text("fn-contract", "Contract"),
     text("fn-input", "Input"),
     text("fn-output", "Output"),
-    code("fn-interface", "Interface", true),
+    code("fn-interface", "Interface"),
   ],
   // Components is free text for now. A later column will pick known UI
   // elements and functional elements from this workspace.
@@ -1081,7 +996,6 @@ function SpecPage({
   title,
   tables,
   spec,
-  agentCells,
   onChangeSpec,
   featureNameInput,
   intro = SPEC_PAGE_INTRO,
@@ -1133,13 +1047,11 @@ function SpecPage({
         {tables.map((table) => (
           <SpecTableSection
             key={table.id}
-            tableId={table.id}
             title={table.title}
             description={table.description}
             columns={spec.specColumns[table.id] ?? seedColumns[table.id] ?? []}
             rows={spec.specRows[table.id] ?? []}
             specRows={spec.specRows}
-            agentCells={agentCells}
             onChangeRows={(update) => updateRows(table.id, update)}
             onChangeColumns={(update) => updateColumns(table.id, update)}
           />
@@ -1150,30 +1062,25 @@ function SpecPage({
 }
 
 type SpecTableSectionProps = {
-  tableId: string;
   title: string;
   description: string;
   columns: SpecColumn[];
   rows: SpecRow[];
   specRows: SpecRowsByTable;
-  agentCells: AgentCells;
   onChangeRows: (update: (rows: SpecRow[]) => SpecRow[]) => void;
   onChangeColumns: (update: (columns: SpecColumn[]) => SpecColumn[]) => void;
 };
 
 function SpecTableSection({
-  tableId,
   title,
   description,
   columns,
   rows,
   specRows,
-  agentCells,
   onChangeRows,
   onChangeColumns,
 }: SpecTableSectionProps) {
-  const editCell = (rowId: string, columnIndex: number, value: string) => {
-    if (isReadOnlyColumn(columns[columnIndex])) return;
+  const editCell = (rowId: string, columnIndex: number, value: string) =>
     onChangeRows((current) =>
       current.map((row) =>
         row.id === rowId
@@ -1181,7 +1088,6 @@ function SpecTableSection({
           : row,
       ),
     );
-  };
 
   const setDone = (rowId: string, done: boolean) =>
     onChangeRows((current) =>
@@ -1211,23 +1117,11 @@ function SpecTableSection({
       ),
     );
 
-  const setColumnReadOnly = (columnId: string, readOnly: boolean) =>
-    onChangeColumns((current) =>
-      current.map((column) =>
-        column.id === columnId ? { ...column, readOnly } : column,
-      ),
-    );
-
   const addColumn = (kind: ColumnKind) => {
     const index = columns.length;
     onChangeColumns((current) => [
       ...current,
-      {
-        id: createColumnId(),
-        name: newColumnName(kind),
-        kind,
-        readOnly: kind === "code",
-      },
+      { id: createColumnId(), name: newColumnName(kind), kind },
     ]);
     onChangeRows((current) =>
       current.map((row) => ({
@@ -1277,7 +1171,6 @@ function SpecTableSection({
         canMoveRight={columnIndex < columns.length - 1}
         onRename={(name) => renameColumn(column.id, name)}
         onKindChange={(kind) => setColumnKind(column.id, kind)}
-        onReadOnlyChange={(readOnly) => setColumnReadOnly(column.id, readOnly)}
         onMoveLeft={() => moveColumn(columnIndex, -1)}
         onMoveRight={() => moveColumn(columnIndex, 1)}
         onDelete={() => deleteColumn(columnIndex)}
@@ -1295,7 +1188,7 @@ function SpecTableSection({
       <CellEditor
         key={`${row.id}-${column.id}`}
         column={column}
-        value={displayCell(agentCells, tableId, row, column, columnIndex)}
+        value={row.cells[columnIndex] ?? ""}
         specRows={specRows}
         onChange={(value) => editCell(row.id, columnIndex, value)}
       />
@@ -1414,7 +1307,6 @@ type ColumnHeaderProps = {
   canMoveRight: boolean;
   onRename: (name: string) => void;
   onKindChange: (kind: ColumnKind) => void;
-  onReadOnlyChange: (readOnly: boolean) => void;
   onMoveLeft: () => void;
   onMoveRight: () => void;
   onDelete: () => void;
@@ -1427,7 +1319,6 @@ function ColumnHeader({
   canMoveRight,
   onRename,
   onKindChange,
-  onReadOnlyChange,
   onMoveLeft,
   onMoveRight,
   onDelete,
@@ -1474,22 +1365,6 @@ function ColumnHeader({
           ✕
         </IconButton>
       </Row>
-      <Row gap={4} align="center">
-        <Pill
-          size="sm"
-          active={!isReadOnlyColumn(column)}
-          onClick={() => onReadOnlyChange(false)}
-        >
-          Edit
-        </Pill>
-        <Pill
-          size="sm"
-          active={isReadOnlyColumn(column)}
-          onClick={() => onReadOnlyChange(true)}
-        >
-          Read-only
-        </Pill>
-      </Row>
     </Stack>
   );
 }
@@ -1502,15 +1377,12 @@ type CellEditorProps = {
 };
 
 function CellEditor({ column, value, specRows, onChange }: CellEditorProps) {
-  const readOnly = isReadOnlyColumn(column);
-
   if (column.kind === "selection" || column.kind === "multi-selection") {
     return (
       <SelectionCellEditor
         value={value}
         specRows={specRows}
         mode={column.kind}
-        readOnly={readOnly}
         onChange={onChange}
       />
     );
@@ -1521,18 +1393,9 @@ function CellEditor({ column, value, specRows, onChange }: CellEditorProps) {
       <TypeScriptCodeEditor
         value={value}
         onChange={onChange}
-        readOnly={readOnly}
-        placeholder={
-          readOnly
-            ? "The agent writes this interface."
-            : `interface ${column.name} {\n  \n}`
-        }
+        placeholder={`interface ${column.name} {\n  \n}`}
       />
     );
-  }
-
-  if (readOnly) {
-    return <ReadOnlyText value={value} />;
   }
 
   return (
@@ -1548,7 +1411,6 @@ type SelectionCellEditorProps = {
   value: string;
   specRows: SpecRowsByTable;
   mode: "selection" | "multi-selection";
-  readOnly: boolean;
   onChange: (value: string) => void;
 };
 
@@ -1556,7 +1418,6 @@ function SelectionCellEditor({
   value,
   specRows,
   mode,
-  readOnly,
   onChange,
 }: SelectionCellEditorProps) {
   const theme = useHostTheme();
@@ -1648,18 +1509,14 @@ function SelectionCellEditor({
     >
       <span
         ref={fieldRef}
-        role={readOnly ? undefined : "button"}
-        tabIndex={readOnly ? undefined : 0}
-        onClick={readOnly ? undefined : toggleOpen}
-        onKeyDown={
-          readOnly
-            ? undefined
-            : (event: { key: string; preventDefault: () => void }) => {
-                if (event.key !== "Enter" && event.key !== " ") return;
-                event.preventDefault();
-                toggleOpen();
-              }
-        }
+        role="button"
+        tabIndex={0}
+        onClick={toggleOpen}
+        onKeyDown={(event: { key: string; preventDefault: () => void }) => {
+          if (event.key !== "Enter" && event.key !== " ") return;
+          event.preventDefault();
+          toggleOpen();
+        }}
         style={{
           display: "flex",
           alignItems: "center",
@@ -1670,7 +1527,7 @@ function SelectionCellEditor({
           padding: "6px 8px",
           fontSize: 13,
           lineHeight: "18px",
-          cursor: readOnly ? "default" : "pointer",
+          cursor: "pointer",
           color: theme.text.primary,
           background: theme.fill.tertiary,
           border: `1px solid ${
@@ -1691,35 +1548,29 @@ function SelectionCellEditor({
           }}
         >
           {selected.length === 0 ? (
-            <span style={{ color: theme.text.tertiary }}>
-              {readOnly ? "The agent writes this column." : placeholder}
-            </span>
+            <span style={{ color: theme.text.tertiary }}>{placeholder}</span>
           ) : (
             selected.map((ref) => (
               <SelectionChip
                 key={selectionRefKey(ref)}
                 resolved={resolveSelectionRef(specRows, ref)}
-                onRemove={
-                  readOnly || !multiple ? undefined : () => removeRef(ref)
-                }
+                onRemove={multiple ? () => removeRef(ref) : undefined}
               />
             ))
           )}
         </span>
-        {!readOnly && (
-          <span
-            aria-hidden
-            style={{
-              flexShrink: 0,
-              fontSize: 10,
-              color: theme.text.tertiary,
-            }}
-          >
-            {open ? "▴" : "▾"}
-          </span>
-        )}
+        <span
+          aria-hidden
+          style={{
+            flexShrink: 0,
+            fontSize: 10,
+            color: theme.text.tertiary,
+          }}
+        >
+          {open ? "▴" : "▾"}
+        </span>
       </span>
-      {open && !readOnly && menuBox && (
+      {open && menuBox && (
         <>
           <span
             onClick={() => {
@@ -2026,38 +1877,16 @@ function fitHeightToContent(textarea: HTMLTextAreaElement) {
   textarea.style.height = `${textarea.scrollHeight + 2}px`;
 }
 
-function ReadOnlyText({ value }: { value: string }) {
-  const theme = useHostTheme();
-  return (
-    <Text
-      size="small"
-      tone={value ? "primary" : "tertiary"}
-      style={{
-        minWidth: TEXT_CELL_MIN_WIDTH,
-        whiteSpace: "pre-wrap",
-        padding: 8,
-        background: theme.fill.tertiary,
-        border: `1px solid ${theme.stroke.tertiary}`,
-        borderRadius: theme.radius.sm,
-      }}
-    >
-      {value || "The agent writes this column."}
-    </Text>
-  );
-}
-
 type TypeScriptCodeEditorProps = {
   value: string;
   onChange: (value: string) => void;
   placeholder: string;
-  readOnly?: boolean;
 };
 
 function TypeScriptCodeEditor({
   value,
   onChange,
   placeholder,
-  readOnly = false,
 }: TypeScriptCodeEditorProps) {
   const theme = useHostTheme();
   const overlayRef = useRef<HTMLPreElement>(null);
@@ -2100,13 +1929,13 @@ function TypeScriptCodeEditor({
     >
       <pre
         ref={overlayRef}
-        aria-hidden={!readOnly}
+        aria-hidden
         style={{
           ...shared,
-          position: readOnly ? "relative" : "absolute",
-          inset: readOnly ? undefined : 0,
+          position: "absolute",
+          inset: 0,
           color: colors.text,
-          pointerEvents: readOnly ? "auto" : "none",
+          pointerEvents: "none",
         }}
       >
         {value ? (
@@ -2115,39 +1944,37 @@ function TypeScriptCodeEditor({
           <span style={{ color: theme.text.quaternary }}>{placeholder}</span>
         )}
       </pre>
-      {!readOnly && (
-        <textarea
-          value={value}
-          placeholder=""
-          spellCheck={false}
-          autoCapitalize="off"
-          autoComplete="off"
-          autoCorrect="off"
-          aria-label="TypeScript interface"
-          onChange={(event: { currentTarget: HTMLTextAreaElement }) =>
-            onChange(event.currentTarget.value)
-          }
-          onScroll={(event: { currentTarget: HTMLTextAreaElement }) => {
-            const overlay = overlayRef.current;
-            if (!overlay) return;
-            overlay.scrollTop = event.currentTarget.scrollTop;
-            overlay.scrollLeft = event.currentTarget.scrollLeft;
-          }}
-          onKeyDown={(event: CodeKeyEvent) => indentOnTab(event, onChange)}
-          style={{
-            ...shared,
-            position: "relative",
-            display: "block",
-            color: "transparent",
-            caretColor: theme.text.primary,
-            background: "transparent",
-            border: "none",
-            outline: "none",
-            resize: "none",
-            WebkitTextFillColor: "transparent",
-          }}
-        />
-      )}
+      <textarea
+        value={value}
+        placeholder=""
+        spellCheck={false}
+        autoCapitalize="off"
+        autoComplete="off"
+        autoCorrect="off"
+        aria-label="TypeScript interface"
+        onChange={(event: { currentTarget: HTMLTextAreaElement }) =>
+          onChange(event.currentTarget.value)
+        }
+        onScroll={(event: { currentTarget: HTMLTextAreaElement }) => {
+          const overlay = overlayRef.current;
+          if (!overlay) return;
+          overlay.scrollTop = event.currentTarget.scrollTop;
+          overlay.scrollLeft = event.currentTarget.scrollLeft;
+        }}
+        onKeyDown={(event: CodeKeyEvent) => indentOnTab(event, onChange)}
+        style={{
+          ...shared,
+          position: "relative",
+          display: "block",
+          color: "transparent",
+          caretColor: theme.text.primary,
+          background: "transparent",
+          border: "none",
+          outline: "none",
+          resize: "none",
+          WebkitTextFillColor: "transparent",
+        }}
+      />
     </div>
   );
 }
@@ -2449,27 +2276,6 @@ function dashLineToBullet(line: string): string {
   const match = line.match(/^(\s*)-\s?(.*)$/);
   if (!match) return line;
   return `${match[1]}• ${match[2]}`;
-}
-
-function isReadOnlyColumn(column: SpecColumn | undefined): boolean {
-  if (!column) return false;
-  if (typeof column.readOnly === "boolean") return column.readOnly;
-  return column.name.trim().toLowerCase() === "interface";
-}
-
-function displayCell(
-  agentCells: AgentCells,
-  tableId: string,
-  row: SpecRow,
-  column: SpecColumn,
-  columnIndex: number,
-): string {
-  if (isReadOnlyColumn(column)) {
-    return (
-      agentCells[tableId]?.[row.id]?.[column.id] ?? row.cells[columnIndex] ?? ""
-    );
-  }
-  return row.cells[columnIndex] ?? "";
 }
 
 function withCell(

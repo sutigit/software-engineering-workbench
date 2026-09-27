@@ -20,9 +20,9 @@ the `surfaces` array. The open task is stored in `hubTask`, the open tab in
 A surface is one tab in a task, an optional workspace rule for agents, and
 per-workspace data that stays local. All surfaces share
 `workbench.canvas.data.json`. Surface data is keyed by task id: `taskSpecs`
-holds human-owned content, `taskAgentCells` holds agent output, and
+holds the spec tables, written by both the user and the agent, and
 `taskArchitecture` holds the mermaid diagrams of the Architecture surface.
-Each spec surface owns its own tables inside `taskSpecs` and `taskAgentCells`.
+Each spec surface owns its own tables inside `taskSpecs`.
 
 | Surface               | Page component             | Workspace rule               | Status |
 | --------------------- | -------------------------- | ---------------------------- | ------ |
@@ -36,8 +36,8 @@ Each spec surface owns its own tables inside `taskSpecs` and `taskAgentCells`.
 Feature specification, UI elements, Functional elements, Unit tests, and
 Integration tests are tabs over one task's data set. They render `SpecPage`
 with different table lists and share the task's `TaskSpec` (`featureName`,
-`specColumns`, `specRows`) and `taskAgentCells[taskId]`, each keyed by table
-id. They share one rule for the same reason.
+`specColumns`, `specRows`), each keyed by table id. They share one rule for
+the same reason.
 
 Architecture stores a list of `ArchitectureDiagram` per task in
 `taskArchitecture[taskId]`. The canvas never renders mermaid.
@@ -48,11 +48,6 @@ wrapper that sets the `--wb-diagram-bg` and `--wb-diagram-fg` variables from
 the host theme. The script depends on `package.json`; run `npm install` once
 in this repo. The agent behaviour is the Architecture section of
 `rules/workbench-canvas.mdc`.
-
-The pre-task top-level keys `featureName`, `specColumns`, `specRows`, and
-`agentCells` are read by `useImportLegacySpec`. When `tasks` was never written
-and those keys hold content, the canvas creates one task from them. The old
-keys stay in the file.
 
 Planned kinds: test coverage catalogue, docs, CI/CD, and kinds the user adds
 later. Build a surface only when the user asks.
@@ -71,17 +66,17 @@ Applies to every current and future surface.
 - Source lives in this repo. Copies under `~/.cursor/projects/<id>/canvases/`
   are overwrite targets. Never edit them as source.
 - `*.canvas.data.json` is per workspace. Never copy it between workspaces.
-  Never seed it. The sync script may move a workspace's own data file to a
-  new canvas file name.
+  Never seed it.
 - Defaults are empty. No demo rows, no sample feature names.
 - Old data files must load. Missing keys and short cell arrays read as empty.
 - `useCanvasState` keys are a public schema shared by all surfaces in the
   data file. Prefix new keys with the surface, and change a shape only with a
   reader for the old shape.
 - UI imports from `cursor/canvas` only. Follow the Cursor canvas skill.
-- Human and agent ownership is defined per surface in a section of
-  `rules/workbench-canvas.mdc`, the one rule the hook copies into workspaces.
-  Do not restate it here.
+- Every cell is writable by the user in the canvas and by the agent in the
+  data file. How the agent writes each surface is defined in a section of
+  `rules/workbench-canvas.mdc`, the one rule the hook copies into
+  workspaces. Do not restate it here.
 
 ## Change protocol
 

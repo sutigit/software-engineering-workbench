@@ -56,11 +56,6 @@ uploaded.
 
 A fresh workspace opens empty.
 
-If you used the earlier standalone Feature specification canvas, the sync hook
-copies its data into the workbench file once. If the workbench had content
-before tasks existed, that content opens as a task named after its feature
-name, or "Imported task" when there was no feature name.
-
 ## Spec and test tables
 
 These tabs together describe one feature that an agent implements. Open each
@@ -97,8 +92,8 @@ them.
 | Unit tests                  | Components, Description                                         |
 | Integration tests           | Components, Description                                         |
 
-Every column is a Text column and Edit, except **Interface**, which is a Code
-column and Read-only.
+Every column is a Text column, except **Interface**, which is a Code column.
+You and the agent can write every cell of every column.
 
 ### Rows
 
@@ -114,29 +109,20 @@ Each column header has:
 - A kind selector: **Text**, **Code**, **Selection**, or **Multi-selection**.
 - **←** and **→** to move the column. **✕** to delete it. The last remaining
   column cannot be deleted.
-- Two pills: **Edit** and **Read-only**.
 
 **+ Add text column**, **+ Add code column**, **+ Add selection column**, and
 **+ Add multi-selection column** add a column to the table. A new text
-column is named "Column" and starts as Edit. A new code column is named
-"Interface" and starts as Read-only. A new selection column is named
-"Selection" and starts as Edit. A new multi-selection column is named
-"Multi-selection" and starts as Edit. Changing the kind in the header does
-not rename the column and does not change the Edit or Read-only pill.
+column is named "Column". A new code column is named "Interface". A new
+selection column is named "Selection". A new multi-selection column is named
+"Multi-selection". Changing the kind in the header does not rename the
+column.
 
-### Edit vs Read-only
+### Who writes a cell
 
-- **Edit** columns are yours on Feature specification, UI elements, and
-  Functional elements. Agents do not change them there.
-- On **Unit tests** and **Integration tests**, you and the agent may both
-  write the Edit columns. The **Components** column names the code-level
-  parts under test. The **Description** column states what to check, in
-  plain English, with no test-framework names.
-- **Read-only** columns belong to the agent. You cannot type in them. The
-  agent fills them when you ask it to implement the spec. A column named
-  "Interface" is agent-owned even when the pill is not set.
-
-Toggle the pill to hand a column to the agent or take it back.
+You can type in any cell, and the agent can write any cell. On **Unit
+tests** and **Integration tests**, the **Components** column names the
+code-level parts under test, and the **Description** column states what to
+check, in plain English, with no test-framework names.
 
 ### Cell editing
 
@@ -146,18 +132,14 @@ Text cells:
 - Press `Tab` on a line that starts with `-` to turn it into a `•` bullet.
   Select several lines to convert them at once. Lines that start with `--`
   do not change.
-- Read-only text cells show "The agent writes this column." until the agent
-  fills them.
 
 Code cells:
 
 - TypeScript syntax highlighting.
 - `Tab` inserts two spaces. With a selection, `Tab` indents the selected
   lines. `Shift+Tab` unindents them.
-- An empty Edit code cell shows an `interface` skeleton named after the
-  column as a hint.
-- Read-only code cells show "The agent writes this interface." until the agent
-  fills them.
+- An empty code cell shows an `interface` skeleton named after the column as
+  a hint.
 
 Selection and multi-selection cells:
 
@@ -168,7 +150,7 @@ Selection and multi-selection cells:
   several chosen rows. The stored value is a link to the row id, not the
   displayed name. If you rename the source row, the choice stays.
 - Click the cell to open the menu. Press `Enter` or `Space` when the cell
-  has focus to do the same. An empty Edit cell shows **Choose one** or
+  has focus to do the same. An empty cell shows **Choose one** or
   **Choose items**. Click outside the menu to close it.
 - A selection cell shows the chosen name as text. Choosing another row
   replaces it. Choosing the same row again clears the cell.
@@ -176,19 +158,18 @@ Selection and multi-selection cells:
   chip to remove it. The menu stays open while you toggle rows.
 - If a chosen source row is deleted, the cell shows **Missing item** until
   you clear that choice.
-- Read-only selection cells show the labels only. Until the agent fills
-  them, they show "The agent writes this column."
 
 ### Work with the agent
 
-1. Fill the Edit columns on Feature specification, UI elements, and
+1. Fill the cells you know on Feature specification, UI elements, and
    Functional elements, and mark which rows matter.
 2. Fill Unit tests and Integration tests, or ask the agent to add those rows.
-3. Ask the agent to implement the specification. Name the task, or leave the
-   task open; the agent uses the open task by default.
-4. The agent reads your rows on these tabs and writes the Read-only columns.
-   When it writes tests, it follows each Description and does not tie that
-   text to a test framework.
+3. Ask the agent to implement the specification, or to fill the cells you
+   left empty. Name the task, or leave the task open; the agent uses the
+   open task by default.
+4. The agent reads your rows on these tabs and writes any cell. When it
+   writes tests, it follows each Description and does not tie that text to a
+   test framework.
 5. Tick **Done** on rows that are complete.
 
 ## Architecture

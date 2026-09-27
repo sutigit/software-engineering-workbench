@@ -20,13 +20,11 @@ Surfaces and their status:
 | Unit tests            | Active | Unit tests table: Components, Description                                                             |
 | Integration tests     | Active | Integration tests table: Components, Description                                                      |
 
-The spec and test surfaces are editable tables. Each column is either **Edit**
-(the user can type) or **Read-only** (the agent writes into `taskAgentCells`).
-The agent fills Read-only columns when asked to implement the spec. On Unit
-tests and Integration tests, Edit columns may also be written by the agent in
-`specRows`. Architecture is a list of mermaid diagrams; the agent runs the
-render script so the stored SVG matches the mermaid source. Ownership rules
-for agents are in `rules/workbench-canvas.mdc`.
+The spec and test surfaces are editable tables. The user types in the canvas
+and the agent writes the same `specRows`; every cell is open to both.
+Architecture is a list of mermaid diagrams; the agent runs the render script
+so the stored SVG matches the mermaid source. The data layout for agents is
+in `rules/workbench-canvas.mdc`.
 
 ## Setup
 
@@ -60,13 +58,6 @@ Workspace data stays local in
 `~/.cursor/projects/<workspace>/canvases/workbench.canvas.data.json`. The
 hook does not copy that file between workspaces and never seeds it. A fresh
 workspace opens empty.
-
-Migration from the earlier standalone Feature specification canvas: in a
-workspace that still has `feature-specification.canvas.data.json`, the hook
-copies it to `workbench.canvas.data.json` once, if the new file does not exist,
-and removes the old canvas copy and the old rule
-`feature-specification-canvas.mdc`. The old data file is left in place. On
-first load, the canvas turns pre-task content into one task.
 
 ## Hook
 

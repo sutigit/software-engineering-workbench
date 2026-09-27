@@ -1,9 +1,9 @@
 ---
-description: Ownership of Workbench canvas data. Agent may write Read-only spec columns, Unit tests and Integration tests Edit cells, and Architecture mermaid source.
+description: Data layout of the Workbench canvas. Agent and user share every spec cell, test row, and Architecture mermaid source.
 alwaysApply: true
 ---
 
-# Workbench canvas ownership
+# Workbench canvas data
 
 The Workbench is the canvas `workbench.canvas.tsx` in this workspace canvases
 folder. Persisted data is `workbench.canvas.data.json` next to it. Do not
@@ -21,62 +21,53 @@ The sidebar lists tasks. Each task has its own Feature specification (tables
 (table `unit-tests`), and Integration tests (table `integration-tests`) tabs.
 
 - `tasks` is the ordered list of `{ "id", "name" }`.
-- `taskSpecs.<taskId>` holds the human-owned spec of one task:
-  `featureName`, `specColumns`, and `specRows`, each keyed by table id.
-- `taskAgentCells.<taskId>` holds the agent output for the same task.
+- `taskSpecs.<taskId>` holds the spec of one task: `featureName`,
+  `specColumns`, and `specRows`, each keyed by table id.
 - `taskArchitecture.<taskId>` holds the Architecture diagrams of the task.
 
 Find a task by its `name` in `tasks` and use its `id` for the other keys.
 When the user does not name a task, use the one in `hubTask`.
 
-The keys `featureName`, `specColumns`, `specRows`, and `agentCells` at the top
-level are from before tasks existed. The canvas imports them into one task on
-first load. Do not write to them.
+### Spec tables
 
-### Human-owned (do not edit)
-
-Do not change these unless the user explicitly asks:
-
-- `tasks` (names, order, ids), add/delete task
-- `taskSpecs.<taskId>.featureName`
-- `taskSpecs.<taskId>.specColumns` (names, kinds, order, `readOnly` flags)
-- `taskSpecs.<taskId>.specRows` cell text for any column that is **not** Read-only,
-  except tables `unit-tests` and `integration-tests` (see below)
-- row ids, the Done checkbox, add/delete row or column, except you may add
-  rows on `unit-tests` and `integration-tests`
-
-A column is human-owned when `readOnly` is missing or `false` (the **Edit** pill).
-
-### Agent-owned (write only here)
-
-Write generated cell values only in `taskAgentCells`:
+You and the user both write `taskSpecs.<taskId>.specRows`. Every cell is
+open to both.
 
 ```json
 {
-  "taskAgentCells": {
+  "taskSpecs": {
     "<taskId>": {
-      "<tableId>": {
-        "<rowId>": {
-          "<columnId>": "generated text"
-        }
+      "featureName": "",
+      "specColumns": {
+        "<tableId>": [{ "id": "<columnId>", "name": "Story", "kind": "text" }]
+      },
+      "specRows": {
+        "<tableId>": [{ "id": "row-<unique>", "done": false, "cells": [""] }]
       }
     }
   }
 }
 ```
 
-Write only for columns with `readOnly: true` (the **Read-only** pill), or whose
-name is `Interface` when `readOnly` is omitted.
-
-You may **read** human-owned cells to implement the spec. You must not rewrite them.
+- `cells` is an array of strings in the order of `specColumns.<tableId>`.
+  When a table has no `specColumns` entry, the canvas uses the defaults in
+  `seedColumns` of the canvas source. Write `specColumns.<tableId>` in full
+  when you change the columns of such a table.
+- A short `cells` array reads as empty in the missing positions.
+- `kind` is `text`, `code`, `selection`, or `multi-selection`. A `code` cell
+  holds TypeScript source.
+- Read all rows of the task for context before you implement it.
+- You may fill or change any cell, and add rows. Give each new row an id of
+  the form `row-<unique>`, `done: false`, and a `cells` array that matches
+  the column order.
+- Change `tasks`, `featureName`, `specColumns`, row ids, the Done checkbox,
+  or delete rows when the user asks for it or the task needs it. Tell the
+  user what you changed.
 
 ### Selection and multi-selection cells
 
 A column `kind` of `selection` or `multi-selection` stores JSON in the same
-string cell as other kinds. Do not change `specColumns` to add these kinds.
-Write the JSON only where you already may write that cell (`taskAgentCells`
-for Read-only columns, or `specRows` on `unit-tests` and `integration-tests`
-Edit columns).
+string cell as other kinds.
 
 - `selection`: one object, or `""` when empty.
 - `multi-selection`: a JSON array of those objects, or `""` when empty.
@@ -93,17 +84,10 @@ text read as empty in the UI.
 
 ## Unit tests and Integration tests
 
-Tables `unit-tests` and `integration-tests` live in the same `taskSpecs` and
-`taskAgentCells` maps as the other spec tables.
-
-Default columns are **Edit** text: `Components` then `Description`. The Done
+Tables `unit-tests` and `integration-tests` follow the spec table rules
+above. Default columns are text: `Components` then `Description`. The Done
 checkbox is part of the row, not a stored column.
 
-These Edit columns are shared. You and the user may both write them in
-`taskSpecs.<taskId>.specRows`:
-
-- You may add rows. Give each row an id of the form `row-<unique>`,
-  `done: false`, and a `cells` array that matches the column order.
 - Write **Components** as the code-level parts under test, in plain text
   when that column is Text. If the user changed the column to Selection or
   Multi-selection, write the JSON refs described above. Do not invent
@@ -113,13 +97,6 @@ These Edit columns are shared. You and the user may both write them in
   a test framework, runner, or assertion library. When you later write the
   test files, follow that description and use the stack the project already
   uses.
-- Do not overwrite a cell the user already filled unless the user asks.
-- Do not change `specColumns`, row ids, or the Done checkbox unless the user
-  asks.
-- Do not delete rows unless the user asks.
-
-If a column on these tables is **Read-only**, write it in `taskAgentCells`
-like any other agent-owned column.
 
 ## Architecture
 
