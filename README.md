@@ -11,25 +11,42 @@ task holds its own content for every surface.
 
 Surfaces and their status:
 
-| Surface               | Status      | Content                                         |
-| --------------------- | ----------- | ----------------------------------------------- |
-| Feature specification | Active      | Feature name, User stories, Acceptance criteria |
-| Architecture          | Placeholder | No content format yet                           |
-| UI elements           | Active      | UI elements table                               |
-| Functional elements   | Active      | React hooks table                               |
-| Unit tests            | Placeholder | No content format yet                           |
+| Surface               | Status      | Content                                                                                               |
+| --------------------- | ----------- | ----------------------------------------------------------------------------------------------------- |
+| Feature specification | Active      | Feature name, User stories, Acceptance criteria, Functional requirements, Non-functional requirements |
+| Architecture          | Active      | Mermaid diagrams, rendered to SVG by `scripts/render-architecture.mjs`                                |
+| UI elements           | Active      | UI elements table                                                                                     |
+| Functional elements   | Active      | React hooks table                                                                                     |
+| Unit tests            | Placeholder | No content format yet                                                                                 |
+| Integration tests     | Placeholder | No content format yet                                                                                 |
 
-The three active surfaces are editable tables. Each column is either **Edit**
+The three spec surfaces are editable tables. Each column is either **Edit**
 (human-owned) or **Read-only** (agent-owned). The agent fills Read-only
-columns when asked to implement the spec. Ownership rules for agents are in
+columns when asked to implement the spec. Architecture is a list of mermaid
+diagrams; the agent runs the render script so the stored SVG matches the
+mermaid source. Ownership rules for agents are in
 `rules/workbench-canvas.mdc`. Placeholder surfaces show a tab and a note and
 store nothing.
+
+## Setup
+
+The render script depends on the npm package `beautiful-mermaid`. Run once in
+this repo:
+
+```bash
+npm install
+```
+
+The canvas itself needs no install.
 
 ## Files
 
 - `workbench.canvas.tsx`: the canvas. Copied into each workspace.
 - `rules/workbench-canvas.mdc`: the agent rule. Copied into each workspace.
 - `scripts/sync-workbench.py`: the copy script, run by the hook.
+- `scripts/render-architecture.mjs`: renders Architecture diagrams to SVG in
+  a workspace data file. Run by the agent, never by the hook.
+- `package.json`: the render script dependencies.
 - `AGENTS.md`: how to change the workbench.
 - `USER-MANUAL.md`: how to use the workbench.
 

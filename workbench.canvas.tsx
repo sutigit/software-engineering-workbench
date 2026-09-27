@@ -5,6 +5,7 @@ import {
   CardHeader,
   Checkbox,
   CollapsibleSection,
+  Divider,
   Grid,
   H1,
   H2,
@@ -16,11 +17,13 @@ import {
   Text,
   Select,
   TextInput,
+  useCanvasAction,
   useCanvasState,
   useHostTheme,
   useEffect,
   useRef,
   useState,
+  type CSSProperties,
   type SetCanvasState,
 } from "cursor/canvas";
 
@@ -56,13 +59,22 @@ type TaskSpec = {
 
 type TaskSpecsById = Record<string, TaskSpec>;
 type TaskAgentCellsById = Record<string, AgentCells>;
+type TaskArchitectureById = Record<string, ArchitectureDiagram[]>;
 
 type SpecUpdate = (spec: TaskSpec) => TaskSpec;
+type DiagramsUpdate = (
+  diagrams: ArchitectureDiagram[],
+) => ArchitectureDiagram[];
 
+// Every surface page receives the whole task data set and picks what it
+// shows. The spec pages use `spec`; the Architecture page uses `diagrams`.
 type SurfacePageProps = {
+  task: Task;
   spec: TaskSpec;
   agentCells: AgentCells;
   onChangeSpec: (update: SpecUpdate) => void;
+  diagrams: ArchitectureDiagram[];
+  onChangeDiagrams: (update: DiagramsUpdate) => void;
 };
 
 type SurfacePage = typeof FeatureSpecificationPage;
@@ -84,7 +96,7 @@ const surfaces: Surface[] = [
   {
     id: "architecture",
     title: "Architecture",
-    purpose: "Describe the architecture of the feature.",
+    purpose: "Draw the architecture of the feature as mermaid diagrams.",
     Page: ArchitecturePage,
   },
   {
@@ -105,6 +117,12 @@ const surfaces: Surface[] = [
     purpose: "List the unit tests of the feature.",
     Page: UnitTestsPage,
   },
+  {
+    id: "integration-tests",
+    title: "Integration tests",
+    purpose: "List the integration tests of the feature.",
+    Page: IntegrationTestsPage,
+  },
 ];
 
 export default function WorkbenchCanvas() {
@@ -117,6 +135,8 @@ export default function WorkbenchCanvas() {
   );
   const [taskAgentCells, setTaskAgentCells] =
     useCanvasState<TaskAgentCellsById>("taskAgentCells", {});
+  const [taskArchitecture, setTaskArchitecture] =
+    useCanvasState<TaskArchitectureById>("taskArchitecture", {});
   const [storedTaskId, setTaskId] = useCanvasState<string>("hubTask", "");
   const [storedPageId, setPageId] = useCanvasState<string>(
     "hubPage",
@@ -155,12 +175,19 @@ export default function WorkbenchCanvas() {
     );
     setTaskSpecs((previous) => withoutKey(previous, taskId));
     setTaskAgentCells((previous) => withoutKey(previous, taskId));
+    setTaskArchitecture((previous) => withoutKey(previous, taskId));
   };
 
   const updateSpec = (taskId: string, update: SpecUpdate) =>
     setTaskSpecs((previous) => ({
       ...previous,
       [taskId]: update(normalizeTaskSpec(previous[taskId])),
+    }));
+
+  const updateDiagrams = (taskId: string, update: DiagramsUpdate) =>
+    setTaskArchitecture((previous) => ({
+      ...previous,
+      [taskId]: update(normalizeDiagrams(previous[taskId])),
     }));
 
   return (
@@ -181,10 +208,12 @@ export default function WorkbenchCanvas() {
             pageId={pageId}
             spec={normalizeTaskSpec(taskSpecs[activeTask.id])}
             agentCells={taskAgentCells[activeTask.id] ?? {}}
+            diagrams={normalizeDiagrams(taskArchitecture[activeTask.id])}
             onSelectPage={setPageId}
             onRename={(name) => renameTask(activeTask.id, name)}
             onDelete={() => deleteTask(activeTask.id)}
             onChangeSpec={(update) => updateSpec(activeTask.id, update)}
+            onChangeDiagrams={(update) => updateDiagrams(activeTask.id, update)}
           />
         ) : (
           <NoTasksPage onCreate={createTask} />
@@ -348,8 +377,8 @@ function NoTasksPage({ onCreate }: { onCreate: () => void }) {
     <Stack gap={16} style={{ maxWidth: 960 }}>
       <H1>Software Engineering Workbench</H1>
       <Text size="small" tone="tertiary">
-        A task holds one feature specification with its UI elements and
-        functional elements. Data stays in this workspace.
+        A task holds one feature specification with its architecture, UI
+        elements, and functional elements. Data stays in this workspace.
       </Text>
       <Row>
         <Button variant="primary" onClick={onCreate}>
@@ -360,26 +389,20 @@ function NoTasksPage({ onCreate }: { onCreate: () => void }) {
   );
 }
 
-type TaskPageProps = {
-  task: Task;
+type TaskPageProps = SurfacePageProps & {
   pageId: string;
-  spec: TaskSpec;
-  agentCells: AgentCells;
   onSelectPage: (pageId: string) => void;
   onRename: (name: string) => void;
   onDelete: () => void;
-  onChangeSpec: (update: SpecUpdate) => void;
 };
 
 function TaskPage({
   task,
   pageId,
-  spec,
-  agentCells,
   onSelectPage,
   onRename,
   onDelete,
-  onChangeSpec,
+  ...pageProps
 }: TaskPageProps) {
   const activeSurface = surfaces.find((surface) => surface.id === pageId);
   return (
@@ -387,11 +410,7 @@ function TaskPage({
       <TaskHeader task={task} onRename={onRename} onDelete={onDelete} />
       <TaskTabs activePageId={pageId} onSelect={onSelectPage} />
       {activeSurface ? (
-        <activeSurface.Page
-          spec={spec}
-          agentCells={agentCells}
-          onChangeSpec={onChangeSpec}
-        />
+        <activeSurface.Page task={task} {...pageProps} />
       ) : (
         <OverviewTab onOpen={onSelectPage} />
       )}
@@ -521,17 +540,17 @@ function createTaskId(): string {
   return `task-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-// MARK: - Architecture and Unit tests
+// MARK: - Unit tests and Integration tests
 
 // These surfaces have a tab but no content format yet. They store nothing
 // until their format is decided.
 
-function ArchitecturePage() {
-  return <PlaceholderPage title="Architecture" />;
-}
-
 function UnitTestsPage() {
   return <PlaceholderPage title="Unit tests" />;
+}
+
+function IntegrationTestsPage() {
+  return <PlaceholderPage title="Integration tests" />;
 }
 
 function PlaceholderPage({ title }: { title: string }) {
@@ -543,6 +562,272 @@ function PlaceholderPage({ title }: { title: string }) {
       </Text>
     </Stack>
   );
+}
+
+// MARK: - Architecture
+
+// A task holds a list of mermaid diagrams in `taskArchitecture[taskId]`.
+// The canvas does not render mermaid. `scripts/render-architecture.mjs` in
+// the source repo turns `source` into `svg` with beautiful-mermaid and
+// records the text it rendered in `renderedSource`. The canvas only shows
+// the stored picture; `source !== renderedSource` means unsaved changes.
+//
+// Ownership: user and agent both edit `title` and `source`. Only the render
+// script writes `svg`, `renderedSource`, and `renderError`.
+//
+// The canvas cannot run the script. "Save changes" asks the agent to run it.
+// The canvas SDK has no action that posts into the open chat, so the request
+// opens a new chat with the prompt pre-filled; the user submits it.
+
+type ArchitectureDiagram = {
+  id: string;
+  title: string;
+  source: string;
+  renderedSource: string;
+  svg: string;
+  renderError: string;
+};
+
+const NEW_DIAGRAM_TITLE = "Untitled diagram";
+const DIAGRAM_TITLE_MAX_WIDTH = 360;
+// Editor and preview sit side by side and wrap to one column below this.
+const DIAGRAM_PANE_MIN_WIDTH = 360;
+const DIAGRAM_EDITOR_MIN_ROWS = 8;
+
+function ArchitecturePage({
+  task,
+  diagrams,
+  onChangeDiagrams,
+}: SurfacePageProps) {
+  const dispatch = useCanvasAction();
+  const requestRender = () =>
+    dispatch({
+      type: "newComposerChat",
+      userPrompt: `Render the Architecture diagrams of task ${displayTaskName(task)}.`,
+    });
+
+  const editDiagram = (
+    diagramId: string,
+    patch: Partial<Pick<ArchitectureDiagram, "title" | "source">>,
+  ) =>
+    onChangeDiagrams((current) =>
+      current.map((diagram) =>
+        diagram.id === diagramId ? { ...diagram, ...patch } : diagram,
+      ),
+    );
+
+  const addDiagram = () =>
+    onChangeDiagrams((current) => [...current, createDiagram()]);
+
+  const deleteDiagram = (diagramId: string) =>
+    onChangeDiagrams((current) =>
+      current.filter((diagram) => diagram.id !== diagramId),
+    );
+
+  return (
+    <Stack gap={24} style={{ maxWidth: SPEC_PAGE_MAX_WIDTH }}>
+      <Stack gap={8}>
+        <H2>Architecture</H2>
+        <Text size="small" tone="tertiary">
+          Each diagram is mermaid code. Edits are saved automatically. The
+          picture updates when the agent renders the diagrams.
+        </Text>
+      </Stack>
+
+      {diagrams.map((diagram, index) => (
+        <Stack key={diagram.id} gap={24}>
+          {index > 0 && <Divider />}
+          <DiagramSection
+            diagram={diagram}
+            onChangeTitle={(title) => editDiagram(diagram.id, { title })}
+            onChangeSource={(source) => editDiagram(diagram.id, { source })}
+            onRequestRender={requestRender}
+            onDelete={() => deleteDiagram(diagram.id)}
+          />
+        </Stack>
+      ))}
+
+      <Row>
+        <Button variant="ghost" onClick={addDiagram}>
+          + Add diagram
+        </Button>
+      </Row>
+    </Stack>
+  );
+}
+
+type DiagramSectionProps = {
+  diagram: ArchitectureDiagram;
+  onChangeTitle: (title: string) => void;
+  onChangeSource: (source: string) => void;
+  onRequestRender: () => void;
+  onDelete: () => void;
+};
+
+function DiagramSection({
+  diagram,
+  onChangeTitle,
+  onChangeSource,
+  onRequestRender,
+  onDelete,
+}: DiagramSectionProps) {
+  const hasUnrenderedChanges = diagram.source !== diagram.renderedSource;
+  return (
+    <Stack gap={12}>
+      <Row gap={12} align="center" wrap>
+        <TextInput
+          value={diagram.title}
+          onChange={onChangeTitle}
+          placeholder="Diagram title"
+          style={{ width: DIAGRAM_TITLE_MAX_WIDTH, maxWidth: "100%" }}
+        />
+        <DeleteDiagramButton onDelete={onDelete} />
+      </Row>
+      <Row gap={16} align="start" wrap>
+        <Stack
+          gap={8}
+          style={{ flex: `1 1 ${DIAGRAM_PANE_MIN_WIDTH}px`, minWidth: 0 }}
+        >
+          <MermaidCodeEditor value={diagram.source} onChange={onChangeSource} />
+          {hasUnrenderedChanges && (
+            <Row gap={8} align="center" wrap>
+              <Text size="small" tone="secondary">
+                Changes not rendered yet
+              </Text>
+              <Button variant="secondary" onClick={onRequestRender}>
+                Save changes
+              </Button>
+            </Row>
+          )}
+          {diagram.renderError && (
+            <Text size="small" tone="secondary">
+              {diagram.renderError}
+            </Text>
+          )}
+        </Stack>
+        {diagram.svg && <DiagramPreview svg={diagram.svg} />}
+      </Row>
+    </Stack>
+  );
+}
+
+function DeleteDiagramButton({ onDelete }: { onDelete: () => void }) {
+  const [confirming, setConfirming] = useState(false);
+  if (!confirming) {
+    return (
+      <Button variant="ghost" onClick={() => setConfirming(true)}>
+        Delete diagram
+      </Button>
+    );
+  }
+  return (
+    <Row gap={8} align="center" wrap>
+      <Text size="small" tone="secondary">
+        Delete this diagram?
+      </Text>
+      <Button variant="primary" onClick={onDelete}>
+        Delete
+      </Button>
+      <Button variant="ghost" onClick={() => setConfirming(false)}>
+        Cancel
+      </Button>
+    </Row>
+  );
+}
+
+// The SVG is rendered with `bg: var(--wb-diagram-bg)` and
+// `fg: var(--wb-diagram-fg)`, so the wrapper sets those two variables from
+// the host theme and one stored picture reads in dark and light themes.
+function DiagramPreview({ svg }: { svg: string }) {
+  const theme = useHostTheme();
+  const style = {
+    "--wb-diagram-bg": theme.bg.editor,
+    "--wb-diagram-fg": theme.text.primary,
+    flex: `1 1 ${DIAGRAM_PANE_MIN_WIDTH}px`,
+    minWidth: 0,
+    overflow: "auto",
+    padding: 8,
+    background: theme.bg.editor,
+    border: `1px solid ${theme.stroke.tertiary}`,
+    borderRadius: theme.radius.sm,
+  } as CSSProperties;
+  return <div style={style} dangerouslySetInnerHTML={{ __html: svg }} />;
+}
+
+type MermaidCodeEditorProps = {
+  value: string;
+  onChange: (value: string) => void;
+};
+
+function MermaidCodeEditor({ value, onChange }: MermaidCodeEditorProps) {
+  const theme = useHostTheme();
+  const lineCount = Math.max(DIAGRAM_EDITOR_MIN_ROWS, value.split("\n").length);
+  return (
+    <textarea
+      value={value}
+      placeholder="Mermaid code"
+      spellCheck={false}
+      autoCapitalize="off"
+      autoComplete="off"
+      autoCorrect="off"
+      aria-label="Mermaid code"
+      onChange={(event: { currentTarget: HTMLTextAreaElement }) =>
+        onChange(event.currentTarget.value)
+      }
+      onKeyDown={(event: CodeKeyEvent) => indentOnTab(event, onChange)}
+      style={{
+        boxSizing: "border-box",
+        display: "block",
+        width: "100%",
+        height: lineCount * CODE_LINE_HEIGHT + CODE_PADDING * 2,
+        fontFamily: CODE_FONT_FAMILY,
+        fontSize: CODE_FONT_SIZE,
+        lineHeight: `${CODE_LINE_HEIGHT}px`,
+        tabSize: 2,
+        padding: CODE_PADDING,
+        margin: 0,
+        whiteSpace: "pre",
+        overflowX: "auto",
+        overflowY: "hidden",
+        resize: "none",
+        outline: "none",
+        color: theme.text.primary,
+        background: theme.fill.tertiary,
+        border: `1px solid ${theme.stroke.secondary}`,
+        borderRadius: theme.radius.sm,
+      }}
+    />
+  );
+}
+
+// A stored diagram can predate a field. Missing fields read as empty.
+function normalizeDiagrams(
+  diagrams: Partial<ArchitectureDiagram>[] | undefined,
+): ArchitectureDiagram[] {
+  if (!Array.isArray(diagrams)) return [];
+  return diagrams.map((diagram) => ({
+    id: diagram.id ?? "",
+    title: diagram.title ?? "",
+    source: diagram.source ?? "",
+    renderedSource: diagram.renderedSource ?? "",
+    svg: diagram.svg ?? "",
+    renderError: diagram.renderError ?? "",
+  }));
+}
+
+function createDiagram(): ArchitectureDiagram {
+  return {
+    id: createDiagramId(),
+    title: NEW_DIAGRAM_TITLE,
+    source: "",
+    renderedSource: "",
+    svg: "",
+    renderError: "",
+  };
+}
+
+function createDiagramId(): string {
+  return `arch-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
 // MARK: - Feature specification
@@ -588,6 +873,8 @@ const CODE_INDENT = "  ";
 const CODE_FONT_FAMILY =
   "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace";
 const CODE_FONT_SIZE = 12;
+const HELP_ICON_SIZE = 16;
+const HELP_POPOVER_WIDTH = 280;
 
 const text = (id: string, name: string, readOnly = false): SpecColumn => ({
   id,
@@ -602,24 +889,69 @@ const code = (id: string, name: string, readOnly = false): SpecColumn => ({
   readOnly,
 });
 
-type TableMeta = { id: string; title: string };
+// `description` is the hover tooltip on the help icon in the section header.
+type TableMeta = { id: string; title: string; description: string };
 
 const featureSpecificationTables: TableMeta[] = [
-  { id: "user-stories", title: "User stories" },
-  { id: "acceptance-criteria", title: "Acceptance criteria" },
+  {
+    id: "user-stories",
+    title: "User stories",
+    description:
+      "Short statements of what a user wants and why, written from the " +
+      "user's view (\"As a …, I want …, so that …\"). They define the scope " +
+      "and value of the feature, not the design.",
+  },
+  {
+    id: "acceptance-criteria",
+    title: "Acceptance criteria",
+    description:
+      "Testable conditions that must be true for a user story to count as " +
+      "done. They turn a story into a pass or fail check and are the base " +
+      "for tests.",
+  },
+  {
+    id: "functional-requirements",
+    title: "Functional requirements",
+    description:
+      "What the system must do. Specific behaviours, inputs, outputs, and " +
+      "rules. They drive the components, interfaces, and data flow of the " +
+      "architecture.",
+  },
+  {
+    id: "non-functional-requirements",
+    title: "Non-functional requirements",
+    description:
+      "How well the system must do it. Performance, security, reliability, " +
+      "scalability, accessibility, maintainability. They drive technology " +
+      "choices and architecture trade-offs.",
+  },
 ];
 
 const uiElementsTables: TableMeta[] = [
-  { id: "ui-elements", title: "UI elements" },
+  {
+    id: "ui-elements",
+    title: "UI elements",
+    description:
+      "The visual components the feature needs, with their contract and " +
+      "interface.",
+  },
 ];
 
 const reactHooksTables: TableMeta[] = [
-  { id: "react-hooks", title: "React hooks" },
+  {
+    id: "react-hooks",
+    title: "React hooks",
+    description:
+      "The functional building blocks (state, effects, data access) the " +
+      "feature needs, with input and output.",
+  },
 ];
 
 const seedColumns: Record<string, SpecColumn[]> = {
   "user-stories": [text("us-story", "Story")],
   "acceptance-criteria": [text("ac-criterion", "Criterion")],
+  "functional-requirements": [text("fr-requirement", "Requirement")],
+  "non-functional-requirements": [text("nfr-requirement", "Requirement")],
   "ui-elements": [
     text("ui-element", "UI element"),
     text("ui-description", "Description"),
@@ -738,6 +1070,7 @@ function SpecPage({
             key={table.id}
             tableId={table.id}
             title={table.title}
+            description={table.description}
             columns={spec.specColumns[table.id] ?? seedColumns[table.id] ?? []}
             rows={spec.specRows[table.id] ?? []}
             agentCells={agentCells}
@@ -753,6 +1086,7 @@ function SpecPage({
 type SpecTableSectionProps = {
   tableId: string;
   title: string;
+  description: string;
   columns: SpecColumn[];
   rows: SpecRow[];
   agentCells: AgentCells;
@@ -763,6 +1097,7 @@ type SpecTableSectionProps = {
 function SpecTableSection({
   tableId,
   title,
+  description,
   columns,
   rows,
   agentCells,
@@ -909,7 +1244,12 @@ function SpecTableSection({
   );
 
   return (
-    <CollapsibleSection title={title} count={rows.length} defaultOpen>
+    <CollapsibleSection
+      title={title}
+      count={rows.length}
+      trailing={<TableHelpIcon description={description} />}
+      defaultOpen
+    >
       <Stack gap={8}>
         <Table
           headers={headers}
@@ -930,6 +1270,65 @@ function SpecTableSection({
         </Row>
       </Stack>
     </CollapsibleSection>
+  );
+}
+
+// The canvas SDK has no Tooltip component and the canvas webview does not
+// paint native `title` tooltips, so the popover is rendered by hand. The icon
+// sits inside the CollapsibleSection header, which toggles on click, so the
+// click must not bubble.
+function TableHelpIcon({ description }: { description: string }) {
+  const theme = useHostTheme();
+  const [open, setOpen] = useState(false);
+  return (
+    <span
+      tabIndex={0}
+      aria-label="What this table is for"
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+      onFocus={() => setOpen(true)}
+      onBlur={() => setOpen(false)}
+      onClick={(event: { stopPropagation: () => void }) =>
+        event.stopPropagation()
+      }
+      style={{
+        position: "relative",
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        width: HELP_ICON_SIZE,
+        height: HELP_ICON_SIZE,
+        borderRadius: HELP_ICON_SIZE / 2,
+        fontSize: 11,
+        lineHeight: 1,
+        cursor: "help",
+        color: open ? theme.text.primary : theme.text.tertiary,
+        background: open ? theme.fill.secondary : theme.fill.quaternary,
+      }}
+    >
+      ?
+      {open && (
+        <span
+          role="tooltip"
+          style={{
+            position: "absolute",
+            top: "100%",
+            right: 0,
+            marginTop: 4,
+            width: HELP_POPOVER_WIDTH,
+            padding: 8,
+            zIndex: 1,
+            textAlign: "left",
+            cursor: "default",
+            background: theme.bg.elevated,
+            border: `1px solid ${theme.stroke.secondary}`,
+            borderRadius: theme.radius.sm,
+          }}
+        >
+          <Text size="small">{description}</Text>
+        </span>
+      )}
+    </span>
   );
 }
 
@@ -1248,27 +1647,7 @@ function TypeScriptCodeEditor({
             overlay.scrollTop = event.currentTarget.scrollTop;
             overlay.scrollLeft = event.currentTarget.scrollLeft;
           }}
-          onKeyDown={(event: {
-            key: string;
-            shiftKey: boolean;
-            preventDefault: () => void;
-            currentTarget: HTMLTextAreaElement;
-          }) => {
-            if (event.key !== "Tab") return;
-            event.preventDefault();
-            const result = applyTabIndent(
-              event.currentTarget.value,
-              event.currentTarget.selectionStart,
-              event.currentTarget.selectionEnd,
-              event.shiftKey,
-            );
-            onChange(result.value);
-            const textarea = event.currentTarget;
-            queueMicrotask(() => {
-              textarea.selectionStart = result.start;
-              textarea.selectionEnd = result.end;
-            });
-          }}
+          onKeyDown={(event: CodeKeyEvent) => indentOnTab(event, onChange)}
           style={{
             ...shared,
             position: "relative",
@@ -1484,6 +1863,27 @@ function isIdentStart(char: string): boolean {
 
 function isIdentPart(char: string): boolean {
   return /[A-Za-z0-9_$]/.test(char);
+}
+
+type CodeKeyEvent = TextKeyEvent & { shiftKey: boolean };
+
+// `Tab` indents and `Shift+Tab` unindents in every code editor. The caret is
+// restored after React re-renders the controlled textarea.
+function indentOnTab(event: CodeKeyEvent, onChange: (value: string) => void) {
+  if (event.key !== "Tab") return;
+  event.preventDefault();
+  const textarea = event.currentTarget;
+  const result = applyTabIndent(
+    textarea.value,
+    textarea.selectionStart,
+    textarea.selectionEnd,
+    event.shiftKey,
+  );
+  onChange(result.value);
+  queueMicrotask(() => {
+    textarea.selectionStart = result.start;
+    textarea.selectionEnd = result.end;
+  });
 }
 
 function applyTabIndent(

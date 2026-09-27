@@ -20,16 +20,18 @@ the `surfaces` array. The open task is stored in `hubTask`, the open tab in
 A surface is one tab in a task, an optional workspace rule for agents, and
 per-workspace data that stays local. All surfaces share
 `workbench.canvas.data.json`. Surface data is keyed by task id: `taskSpecs`
-holds human-owned content, `taskAgentCells` holds agent output. Each surface
-owns its own tables inside those keys.
+holds human-owned content, `taskAgentCells` holds agent output, and
+`taskArchitecture` holds the mermaid diagrams of the Architecture surface.
+Each spec surface owns its own tables inside `taskSpecs` and `taskAgentCells`.
 
 | Surface               | Page component             | Workspace rule               | Status      |
 | --------------------- | -------------------------- | ---------------------------- | ----------- |
 | Feature specification | `FeatureSpecificationPage` | `rules/workbench-canvas.mdc` | Active      |
-| Architecture          | `ArchitecturePage`         | none                         | Placeholder |
+| Architecture          | `ArchitecturePage`         | `rules/workbench-canvas.mdc` | Active      |
 | UI elements           | `UiElementsPage`           | `rules/workbench-canvas.mdc` | Active      |
 | Functional elements   | `FunctionalElementsPage`   | `rules/workbench-canvas.mdc` | Active      |
 | Unit tests            | `UnitTestsPage`            | none                         | Placeholder |
+| Integration tests     | `IntegrationTestsPage`     | none                         | Placeholder |
 
 Placeholder surfaces have a tab and an Overview card but no content format and
 no data keys. Give them a format, tables, and a rule section before agents
@@ -41,13 +43,23 @@ and share the task's `TaskSpec` (`featureName`, `specColumns`, `specRows`) and
 `taskAgentCells[taskId]`, each keyed by table id. They share one rule for the
 same reason.
 
+Architecture stores a list of `ArchitectureDiagram` per task in
+`taskArchitecture[taskId]`. The canvas never renders mermaid.
+`scripts/render-architecture.mjs` turns `source` into `svg` with the npm
+package `beautiful-mermaid` and writes `svg`, `renderedSource`, and
+`renderError`; the canvas shows `svg` with `dangerouslySetInnerHTML` inside a
+wrapper that sets the `--wb-diagram-bg` and `--wb-diagram-fg` variables from
+the host theme. The script depends on `package.json`; run `npm install` once
+in this repo. The agent behaviour is the Architecture section of
+`rules/workbench-canvas.mdc`.
+
 The pre-task top-level keys `featureName`, `specColumns`, `specRows`, and
 `agentCells` are read by `useImportLegacySpec`. When `tasks` was never written
 and those keys hold content, the canvas creates one task from them. The old
 keys stay in the file.
 
-Planned kinds: architecture diagrams, test coverage catalogue, docs, CI/CD, and
-kinds the user adds later. Build a surface only when the user asks.
+Planned kinds: test coverage catalogue, docs, CI/CD, and kinds the user adds
+later. Build a surface only when the user asks.
 
 Every surface has a stable `id`, a title, and a one-line purpose in the
 `surfaces` array. The tab bar and the Overview tab render those fields.

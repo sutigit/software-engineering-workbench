@@ -1,5 +1,5 @@
 ---
-description: Ownership of Workbench canvas data. Agent may write only Read-only columns of the spec tabs.
+description: Ownership of Workbench canvas data. Agent may write only Read-only columns of the spec tabs and the mermaid source of Architecture diagrams.
 alwaysApply: true
 ---
 
@@ -15,15 +15,17 @@ that file into each workspace. Do not treat the workspace copy as the source.
 ## Tasks
 
 The sidebar lists tasks. Each task has its own Feature specification (tables
-`user-stories`, `acceptance-criteria`), UI elements (table `ui-elements`), and
-Functional elements (table `react-hooks`) tabs.
+`user-stories`, `acceptance-criteria`, `functional-requirements`,
+`non-functional-requirements`), Architecture (mermaid diagrams), UI elements
+(table `ui-elements`), and Functional elements (table `react-hooks`) tabs.
 
 - `tasks` is the ordered list of `{ "id", "name" }`.
 - `taskSpecs.<taskId>` holds the human-owned spec of one task:
   `featureName`, `specColumns`, and `specRows`, each keyed by table id.
 - `taskAgentCells.<taskId>` holds the agent output for the same task.
+- `taskArchitecture.<taskId>` holds the Architecture diagrams of the task.
 
-Find a task by its `name` in `tasks` and use its `id` for the two other keys.
+Find a task by its `name` in `tasks` and use its `id` for the other keys.
 When the user does not name a task, use the one in `hubTask`.
 
 The keys `featureName`, `specColumns`, `specRows`, and `agentCells` at the top
@@ -64,3 +66,44 @@ Write only for columns with `readOnly: true` (the **Read-only** pill), or whose
 name is `Interface` when `readOnly` is omitted.
 
 You may **read** human-owned cells to implement the spec. You must not rewrite them.
+
+## Architecture
+
+`taskArchitecture.<taskId>` is an ordered list of diagrams:
+
+```json
+{
+  "taskArchitecture": {
+    "<taskId>": [
+      {
+        "id": "arch-<unique>",
+        "title": "Untitled diagram",
+        "source": "<mermaid text>",
+        "renderedSource": "<mermaid text the svg was made from>",
+        "svg": "<svg string>",
+        "renderError": ""
+      }
+    ]
+  }
+}
+```
+
+A missing key means the task has no diagrams. Missing fields read as empty.
+
+- Read `source` of every diagram for context when you implement the task.
+- You and the user both may edit `title` and `source`. Add or delete a
+  diagram only when the user asks. A new diagram gets an id of the form
+  `arch-<unique>` and an empty `source`.
+- After you change any `source`, run
+  `node ~/Projects/software-engineering-workbench/scripts/render-architecture.mjs <data file>`
+  so the picture matches the text. `<data file>` is the
+  `workbench.canvas.data.json` of this workspace.
+- When the user asks to render the Architecture diagrams of a task (the
+  **Save changes** button in the canvas sends that request), run the same
+  command. Pass the task id as a second argument to limit the run to that
+  task.
+- Never write `svg`, `renderedSource`, or `renderError` by hand. Only the
+  script writes them.
+- The script needs `npm install` to have been run once in
+  `~/Projects/software-engineering-workbench`. If it fails with a missing
+  `beautiful-mermaid` package, tell the user to run it.

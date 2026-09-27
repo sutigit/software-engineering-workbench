@@ -1,0 +1,12 @@
+{
+  "name": "software-engineering-workbench",
+  "private": true,
+  "type": "module",
+  "description": "Render script dependencies for the Architecture surface of the workbench canvas.",
+  "scripts": {
+    "render-architecture": "node scripts/render-architecture.mjs"
+  },
+  "dependencies": {
+    "beautiful-mermaid": "^1.1.3"
+  }
+}

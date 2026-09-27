@@ -32,9 +32,10 @@ The workbench opens with a sidebar on the left and a task page on the right.
 
 ## Tasks
 
-A task is one unit of work. It has a name and six tabs: **Overview**,
+A task is one unit of work. It has a name and seven tabs: **Overview**,
 **Feature specification**, **Architecture**, **UI elements**, **Functional
-elements**, and **Unit tests**. Each task has its own content in every tab.
+elements**, **Unit tests**, and **Integration tests**. Each task has its own
+content in every tab.
 
 - **+ New task** at the bottom of the sidebar adds a task named
   "Untitled task" and opens its Overview tab.
@@ -42,11 +43,11 @@ elements**, and **Unit tests**. Each task has its own content in every tab.
   sidebar shows the new name as you type.
 - **Delete task** next to the name asks "Delete this task and all its
   content?". **Delete** removes the task and its tabs. **Cancel** keeps it.
-- The tab bar under the name switches between the six tabs.
+- The tab bar under the name switches between the seven tabs.
 - **Overview** shows one card per tab in a two-column grid. **Open** on a
   card shows that tab.
-- **Architecture** and **Unit tests** have no content format yet. Each shows
-  its title and a note. They store nothing.
+- **Unit tests** and **Integration tests** have no content format yet. Each
+  shows its title and a note. They store nothing.
 
 ## Where your data lives
 
@@ -68,25 +69,31 @@ These three tabs together describe one feature that an agent implements. Open
 each from the tab bar or from its Overview card. Each tab shows only its own
 tables. All three tabs save into the same task.
 
-- **Feature specification** has a **Feature name** input at the top and two
-  tables: **User stories** and **Acceptance criteria**.
+- **Feature specification** has a **Feature name** input at the top and four
+  tables in this order: **User stories**, **Acceptance criteria**,
+  **Functional requirements**, and **Non-functional requirements**.
 - **UI elements** has one table, **UI elements**.
 - **Functional elements** has one table, **React hooks**.
 
-Each table is a collapsible section with a row count. An empty table shows
-"No rows yet." The sections below apply to every table on the three tabs.
+Each table is a collapsible section with a row count and a **?** icon at the
+right of its header. Hover or focus the icon to read what the table is for.
+Clicking the icon does not collapse the section. An empty
+table shows "No rows yet." The sections below apply to every table on the
+three tabs.
 
 ### Default columns
 
 A new task starts with these columns. You can rename, move, add, or delete
 them.
 
-| Table               | Columns                                                          |
-| ------------------- | ---------------------------------------------------------------- |
-| User stories        | Story                                                            |
-| Acceptance criteria | Criterion                                                        |
-| UI elements         | UI element, Description, Contract, Parameters, Interface (code)  |
-| React hooks         | Hook, Description, Contract, Input, Output, Interface (code)     |
+| Table                       | Columns                                                          |
+| --------------------------- | ---------------------------------------------------------------- |
+| User stories                | Story                                                            |
+| Acceptance criteria         | Criterion                                                        |
+| Functional requirements     | Requirement                                                      |
+| Non-functional requirements | Requirement                                                      |
+| UI elements                 | UI element, Description, Contract, Parameters, Interface (code)  |
+| React hooks                 | Hook, Description, Contract, Input, Output, Interface (code)     |
 
 Every column is a Text column and Edit, except **Interface**, which is a Code
 column and Read-only.
@@ -149,6 +156,66 @@ Code cells:
 3. The agent reads your rows on all three tabs and writes the Read-only
    columns.
 4. Tick **Done** on rows that are complete.
+
+## Architecture
+
+The **Architecture** tab holds the diagrams of the task. Each diagram is
+mermaid code and a picture of that code. The picture is not live: the agent
+renders it with the render script from `README.md`. There is no preview
+while you type.
+
+A new task has no diagrams. The tab shows its title, a short note, and
+**+ Add diagram**.
+
+### Add a diagram
+
+**+ Add diagram** at the bottom of the tab adds a diagram named "Untitled
+diagram" with empty code.
+
+### Edit a diagram
+
+Each diagram is one section:
+
+- A **Diagram title** input. Type to rename the diagram.
+- A monospace **Mermaid code** editor. `Tab` inserts two spaces. With a
+  selection, `Tab` indents the selected lines. `Shift+Tab` unindents them.
+  There is no syntax highlighting.
+- The rendered picture, to the right of the editor or below it when the
+  window is narrow. It is shown only when a render exists.
+
+Edits are saved automatically. When the code differs from the code the
+picture was made from, the note "Changes not rendered yet" and a **Save
+changes** button appear under the editor.
+
+### Render the picture
+
+**Save changes** opens a new agent chat with the workbench canvas attached
+and the request "Render the Architecture diagrams of task <task name>."
+pre-filled. Press `Enter` to send it. The canvas cannot post into a chat that
+is already open. You can also type the same request in any open chat.
+
+The agent runs the render script, which writes the picture into the
+workspace data file. The note and the button disappear when the picture
+matches the code. If the canvas still shows the old picture, reopen it with
+**Open Canvas**.
+
+If the mermaid code does not parse, the error message appears under the
+editor and the last good picture stays.
+
+The picture follows the Cursor theme. One render reads in dark and light
+themes.
+
+### Delete a diagram
+
+**Delete diagram** next to the title asks "Delete this diagram?". **Delete**
+removes the diagram and its picture. **Cancel** keeps it.
+
+### Work with the agent
+
+- The agent reads the mermaid code of every diagram as context when it
+  implements the task.
+- The agent may write and edit mermaid code, and renders after each edit.
+- The agent adds or deletes diagrams only when you ask.
 
 ## Update the source, not the copy
 
