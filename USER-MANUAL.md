@@ -62,9 +62,9 @@ These tabs together describe one feature that an agent implements. Open each
 from the tab bar or from its Overview card. Each tab shows only its own
 tables. All of them save into the same task.
 
-- **Feature specification** has a **Feature name** input at the top and four
-  tables in this order: **User stories**, **Acceptance criteria**,
-  **Functional requirements**, and **Non-functional requirements**.
+- **Feature specification** has four tables in this order: **User stories**,
+  **Acceptance criteria**, **Functional requirements**, and **Non-functional
+  requirements**.
 - **UI elements** has one table, **UI elements**.
 - **Functional elements** has one table, **React hooks**.
 - **Unit tests** has one table, **Unit tests**.
@@ -110,12 +110,9 @@ Each column header has:
 - **←** and **→** to move the column. **✕** to delete it. The last remaining
   column cannot be deleted.
 
-**+ Add text column**, **+ Add code column**, **+ Add selection column**, and
-**+ Add multi-selection column** add a column to the table. A new text
-column is named "Column". A new code column is named "Interface". A new
-selection column is named "Selection". A new multi-selection column is named
-"Multi-selection". Changing the kind in the header does not rename the
-column.
+**+ Add column** adds a Text column named "Column" at the end of the table.
+Use the kind selector in its header to make it a Code, Selection, or
+Multi-selection column. Changing the kind does not rename the column.
 
 ### Who writes a cell
 

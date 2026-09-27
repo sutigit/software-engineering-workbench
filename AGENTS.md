@@ -35,8 +35,8 @@ Each spec surface owns its own tables inside `taskSpecs`.
 
 Feature specification, UI elements, Functional elements, Unit tests, and
 Integration tests are tabs over one task's data set. They render `SpecPage`
-with different table lists and share the task's `TaskSpec` (`featureName`,
-`specColumns`, `specRows`), each keyed by table id. They share one rule for
+with different table lists and share the task's `TaskSpec` (`specColumns`,
+`specRows`), each keyed by table id. They share one rule for
 the same reason.
 
 Architecture stores a list of `ArchitectureDiagram` per task in

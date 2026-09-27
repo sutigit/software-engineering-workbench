@@ -44,7 +44,6 @@ type Task = {
 };
 
 type TaskSpec = {
-  featureName: string;
   specColumns: Record<string, SpecColumn[]>;
   specRows: SpecRowsByTable;
 };
@@ -201,7 +200,6 @@ export default function WorkbenchCanvas() {
 
 function normalizeTaskSpec(spec: Partial<TaskSpec> | undefined): TaskSpec {
   return {
-    featureName: spec?.featureName ?? "",
     specColumns: spec?.specColumns ?? {},
     specRows: spec?.specRows ?? {},
   };
@@ -759,7 +757,7 @@ type SpecRow = {
 type SpecRowsByTable = Record<string, SpecRow[]>;
 
 const SPEC_PAGE_MAX_WIDTH = 1400;
-const FEATURE_NAME_MAX_WIDTH = 360;
+const NEW_COLUMN_NAME = "Column";
 const TEXT_CELL_MIN_WIDTH = 200;
 const SELECTION_CELL_MIN_WIDTH = 200;
 // Matches the height of a one-line text cell so mixed rows align.
@@ -928,17 +926,11 @@ const seedColumns: Record<string, SpecColumn[]> = {
 };
 
 function FeatureSpecificationPage(props: SurfacePageProps) {
-  const setFeatureName = (featureName: string) =>
-    props.onChangeSpec((spec) => ({ ...spec, featureName }));
   return (
     <SpecPage
       {...props}
       title="Feature specification"
       tables={featureSpecificationTables}
-      featureNameInput={{
-        value: props.spec.featureName,
-        onChange: setFeatureName,
-      }}
     />
   );
 }
@@ -979,16 +971,9 @@ function IntegrationTestsPage(props: SurfacePageProps) {
   );
 }
 
-type FeatureNameInput = {
-  value: string;
-  onChange: (value: string) => void;
-};
-
 type SpecPageProps = SurfacePageProps & {
   title: string;
   tables: TableMeta[];
-  // Only the Feature specification page names the feature.
-  featureNameInput?: FeatureNameInput;
   intro?: string;
 };
 
@@ -997,7 +982,6 @@ function SpecPage({
   tables,
   spec,
   onChangeSpec,
-  featureNameInput,
   intro = SPEC_PAGE_INTRO,
 }: SpecPageProps) {
   const updateRows = (
@@ -1030,14 +1014,6 @@ function SpecPage({
     <Stack gap={24} style={{ maxWidth: SPEC_PAGE_MAX_WIDTH }}>
       <Stack gap={8}>
         <H2>{title}</H2>
-        {featureNameInput && (
-          <TextInput
-            value={featureNameInput.value}
-            onChange={featureNameInput.onChange}
-            placeholder="Feature name"
-            style={{ maxWidth: FEATURE_NAME_MAX_WIDTH }}
-          />
-        )}
         <Text size="small" tone="tertiary">
           {intro}
         </Text>
@@ -1117,11 +1093,12 @@ function SpecTableSection({
       ),
     );
 
-  const addColumn = (kind: ColumnKind) => {
+  // A new column is always Text. The kind selector in its header changes it.
+  const addColumn = () => {
     const index = columns.length;
     onChangeColumns((current) => [
       ...current,
-      { id: createColumnId(), name: newColumnName(kind), kind },
+      { id: createColumnId(), name: NEW_COLUMN_NAME, kind: "text" },
     ]);
     onChangeRows((current) =>
       current.map((row) => ({
@@ -1223,17 +1200,8 @@ function SpecTableSection({
           <Button variant="ghost" onClick={addRow}>
             + Add row
           </Button>
-          <Button variant="ghost" onClick={() => addColumn("text")}>
-            + Add text column
-          </Button>
-          <Button variant="ghost" onClick={() => addColumn("code")}>
-            + Add code column
-          </Button>
-          <Button variant="ghost" onClick={() => addColumn("selection")}>
-            + Add selection column
-          </Button>
-          <Button variant="ghost" onClick={() => addColumn("multi-selection")}>
-            + Add multi-selection column
+          <Button variant="ghost" onClick={addColumn}>
+            + Add column
           </Button>
         </Row>
       </Stack>
@@ -2322,13 +2290,6 @@ function createRowId(): string {
 
 function createColumnId(): string {
   return `col-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
-}
-
-function newColumnName(kind: ColumnKind): string {
-  if (kind === "code") return "Interface";
-  if (kind === "selection") return "Selection";
-  if (kind === "multi-selection") return "Multi-selection";
-  return "Column";
 }
 
 function isSelectionRef(value: unknown): value is SelectionRef {

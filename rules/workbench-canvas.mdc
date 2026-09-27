@@ -21,8 +21,8 @@ The sidebar lists tasks. Each task has its own Feature specification (tables
 (table `unit-tests`), and Integration tests (table `integration-tests`) tabs.
 
 - `tasks` is the ordered list of `{ "id", "name" }`.
-- `taskSpecs.<taskId>` holds the spec of one task: `featureName`,
-  `specColumns`, and `specRows`, each keyed by table id.
+- `taskSpecs.<taskId>` holds the spec of one task: `specColumns` and
+  `specRows`, each keyed by table id.
 - `taskArchitecture.<taskId>` holds the Architecture diagrams of the task.
 
 Find a task by its `name` in `tasks` and use its `id` for the other keys.
@@ -37,7 +37,6 @@ open to both.
 {
   "taskSpecs": {
     "<taskId>": {
-      "featureName": "",
       "specColumns": {
         "<tableId>": [{ "id": "<columnId>", "name": "Story", "kind": "text" }]
       },
@@ -60,7 +59,7 @@ open to both.
 - You may fill or change any cell, and add rows. Give each new row an id of
   the form `row-<unique>`, `done: false`, and a `cells` array that matches
   the column order.
-- Change `tasks`, `featureName`, `specColumns`, row ids, the Done checkbox,
+- Change `tasks`, `specColumns`, row ids, the Done checkbox,
   or delete rows when the user asks for it or the task needs it. Tell the
   user what you changed.
 

@@ -11,14 +11,14 @@ task holds its own content for every surface.
 
 Surfaces and their status:
 
-| Surface               | Status | Content                                                                                               |
-| --------------------- | ------ | ----------------------------------------------------------------------------------------------------- |
-| Feature specification | Active | Feature name, User stories, Acceptance criteria, Functional requirements, Non-functional requirements |
-| Architecture          | Active | Mermaid diagrams, rendered to SVG by `scripts/render-architecture.mjs`                                |
-| UI elements           | Active | UI elements table                                                                                     |
-| Functional elements   | Active | React hooks table                                                                                     |
-| Unit tests            | Active | Unit tests table: Components, Description                                                             |
-| Integration tests     | Active | Integration tests table: Components, Description                                                      |
+| Surface               | Status | Content                                                                                 |
+| --------------------- | ------ | --------------------------------------------------------------------------------------- |
+| Feature specification | Active | User stories, Acceptance criteria, Functional requirements, Non-functional requirements |
+| Architecture          | Active | Mermaid diagrams, rendered to SVG by `scripts/render-architecture.mjs`                  |
+| UI elements           | Active | UI elements table                                                                       |
+| Functional elements   | Active | React hooks table                                                                       |
+| Unit tests            | Active | Unit tests table: Components, Description                                               |
+| Integration tests     | Active | Integration tests table: Components, Description                                        |
 
 The spec and test surfaces are editable tables. The user types in the canvas
 and the agent writes the same `specRows`; every cell is open to both.
