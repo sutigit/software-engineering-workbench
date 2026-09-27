@@ -111,14 +111,18 @@ column and Read-only.
 Each column header has:
 
 - A name input. Type to rename the column.
-- A kind selector: **Text** or **Code**.
+- A kind selector: **Text**, **Code**, **Selection**, or **Multi-selection**.
 - **←** and **→** to move the column. **✕** to delete it. The last remaining
   column cannot be deleted.
 - Two pills: **Edit** and **Read-only**.
 
-**+ Add text column** and **+ Add code column** add a column to the table. A
-new text column is named "Column" and starts as Edit. A new code column is
-named "Interface" and starts as Read-only.
+**+ Add text column**, **+ Add code column**, **+ Add selection column**, and
+**+ Add multi-selection column** add a column to the table. A new text
+column is named "Column" and starts as Edit. A new code column is named
+"Interface" and starts as Read-only. A new selection column is named
+"Selection" and starts as Edit. A new multi-selection column is named
+"Multi-selection" and starts as Edit. Changing the kind in the header does
+not rename the column and does not change the Edit or Read-only pill.
 
 ### Edit vs Read-only
 
@@ -154,6 +158,26 @@ Code cells:
   column as a hint.
 - Read-only code cells show "The agent writes this interface." until the agent
   fills them.
+
+Selection and multi-selection cells:
+
+- The menu lists rows from the **UI elements** and **Functional elements**
+  tabs of this task. Each tab is one group. Rows inside a group are a flat
+  list.
+- A selection cell stores one chosen row. A multi-selection cell stores
+  several chosen rows. The stored value is a link to the row id, not the
+  displayed name. If you rename the source row, the choice stays.
+- Click the cell to open the menu. Press `Enter` or `Space` when the cell
+  has focus to do the same. An empty Edit cell shows **Choose one** or
+  **Choose items**. Click outside the menu to close it.
+- A selection cell shows the chosen name as text. Choosing another row
+  replaces it. Choosing the same row again clears the cell.
+- A multi-selection cell shows one chip per chosen row. Click **×** on a
+  chip to remove it. The menu stays open while you toggle rows.
+- If a chosen source row is deleted, the cell shows **Missing item** until
+  you clear that choice.
+- Read-only selection cells show the labels only. Until the agent fills
+  them, they show "The agent writes this column."
 
 ### Work with the agent
 

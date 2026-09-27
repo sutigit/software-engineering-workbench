@@ -70,6 +70,27 @@ name is `Interface` when `readOnly` is omitted.
 
 You may **read** human-owned cells to implement the spec. You must not rewrite them.
 
+### Selection and multi-selection cells
+
+A column `kind` of `selection` or `multi-selection` stores JSON in the same
+string cell as other kinds. Do not change `specColumns` to add these kinds.
+Write the JSON only where you already may write that cell (`taskAgentCells`
+for Read-only columns, or `specRows` on `unit-tests` and `integration-tests`
+Edit columns).
+
+- `selection`: one object, or `""` when empty.
+- `multi-selection`: a JSON array of those objects, or `""` when empty.
+
+```json
+{ "tableId": "ui-elements", "rowId": "row-abc123" }
+```
+
+`tableId` is a table on the UI elements tab (`ui-elements`) or the
+Functional elements tab (`react-hooks`). If those tabs gain more tables,
+those table ids are valid too. `rowId` is the `id` of a row in
+`taskSpecs.<taskId>.specRows.<tableId>`. Invalid JSON and leftover free
+text read as empty in the UI.
+
 ## Unit tests and Integration tests
 
 Tables `unit-tests` and `integration-tests` live in the same `taskSpecs` and
@@ -83,7 +104,11 @@ These Edit columns are shared. You and the user may both write them in
 
 - You may add rows. Give each row an id of the form `row-<unique>`,
   `done: false`, and a `cells` array that matches the column order.
-- Write **Components** as the code-level parts under test, in plain text.
+- Write **Components** as the code-level parts under test, in plain text
+  when that column is Text. If the user changed the column to Selection or
+  Multi-selection, write the JSON refs described above. Do not invent
+  `tableId` or `rowId` values; copy them from existing UI element and
+  functional element rows.
 - Write **Description** as what must be true, in plain English. Do not name
   a test framework, runner, or assertion library. When you later write the
   test files, follow that description and use the stack the project already

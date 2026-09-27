@@ -815,7 +815,12 @@ function createDiagramId(): string {
 // - Read-only (readOnly true): agent. Write only into `taskAgentCells`.
 // AgentCells shape: tableId -> rowId -> columnId -> string
 
-type ColumnKind = "text" | "code";
+type ColumnKind = "text" | "code" | "selection" | "multi-selection";
+
+type SelectionRef = {
+  tableId: string;
+  rowId: string;
+};
 
 type SpecColumn = {
   id: string;
@@ -838,6 +843,11 @@ type SpecRowsByTable = Record<string, SpecRow[]>;
 const SPEC_PAGE_MAX_WIDTH = 1400;
 const FEATURE_NAME_MAX_WIDTH = 360;
 const TEXT_CELL_MIN_WIDTH = 200;
+const SELECTION_CELL_MIN_WIDTH = 200;
+// Matches the height of a one-line text cell so mixed rows align.
+const SELECTION_FIELD_MIN_HEIGHT = 34;
+const SELECTION_MENU_WIDTH = 260;
+const SELECTION_MENU_MAX_HEIGHT = 220;
 const CODE_CELL_MIN_WIDTH = 360;
 const CODE_CELL_MIN_ROWS = 4;
 const CODE_LINE_HEIGHT = 18;
@@ -948,6 +958,25 @@ const integrationTestsTables: TableMeta[] = [
       "Checks of how units work together. Name the code-level components " +
       "under test, then state in plain English what must be true. Do not " +
       "name a test framework.",
+  },
+];
+
+type SelectionCatalogGroup = {
+  id: string;
+  title: string;
+  tables: TableMeta[];
+};
+
+const selectionCatalogGroups: SelectionCatalogGroup[] = [
+  {
+    id: "ui-elements",
+    title: "UI elements",
+    tables: uiElementsTables,
+  },
+  {
+    id: "functional-elements",
+    title: "Functional elements",
+    tables: reactHooksTables,
   },
 ];
 
@@ -1109,6 +1138,7 @@ function SpecPage({
             description={table.description}
             columns={spec.specColumns[table.id] ?? seedColumns[table.id] ?? []}
             rows={spec.specRows[table.id] ?? []}
+            specRows={spec.specRows}
             agentCells={agentCells}
             onChangeRows={(update) => updateRows(table.id, update)}
             onChangeColumns={(update) => updateColumns(table.id, update)}
@@ -1125,6 +1155,7 @@ type SpecTableSectionProps = {
   description: string;
   columns: SpecColumn[];
   rows: SpecRow[];
+  specRows: SpecRowsByTable;
   agentCells: AgentCells;
   onChangeRows: (update: (rows: SpecRow[]) => SpecRow[]) => void;
   onChangeColumns: (update: (columns: SpecColumn[]) => SpecColumn[]) => void;
@@ -1136,6 +1167,7 @@ function SpecTableSection({
   description,
   columns,
   rows,
+  specRows,
   agentCells,
   onChangeRows,
   onChangeColumns,
@@ -1192,7 +1224,7 @@ function SpecTableSection({
       ...current,
       {
         id: createColumnId(),
-        name: kind === "code" ? "Interface" : "Column",
+        name: newColumnName(kind),
         kind,
         readOnly: kind === "code",
       },
@@ -1264,6 +1296,7 @@ function SpecTableSection({
         key={`${row.id}-${column.id}`}
         column={column}
         value={displayCell(agentCells, tableId, row, column, columnIndex)}
+        specRows={specRows}
         onChange={(value) => editCell(row.id, columnIndex, value)}
       />
     )),
@@ -1302,6 +1335,12 @@ function SpecTableSection({
           </Button>
           <Button variant="ghost" onClick={() => addColumn("code")}>
             + Add code column
+          </Button>
+          <Button variant="ghost" onClick={() => addColumn("selection")}>
+            + Add selection column
+          </Button>
+          <Button variant="ghost" onClick={() => addColumn("multi-selection")}>
+            + Add multi-selection column
           </Button>
         </Row>
       </Stack>
@@ -1408,8 +1447,10 @@ function ColumnHeader({
           options={[
             { value: "text", label: "Text" },
             { value: "code", label: "Code" },
+            { value: "selection", label: "Selection" },
+            { value: "multi-selection", label: "Multi-selection" },
           ]}
-          style={{ minWidth: 92 }}
+          style={{ minWidth: 140 }}
         />
         <IconButton
           title="Move column left"
@@ -1456,11 +1497,24 @@ function ColumnHeader({
 type CellEditorProps = {
   column: SpecColumn;
   value: string;
+  specRows: SpecRowsByTable;
   onChange: (value: string) => void;
 };
 
-function CellEditor({ column, value, onChange }: CellEditorProps) {
+function CellEditor({ column, value, specRows, onChange }: CellEditorProps) {
   const readOnly = isReadOnlyColumn(column);
+
+  if (column.kind === "selection" || column.kind === "multi-selection") {
+    return (
+      <SelectionCellEditor
+        value={value}
+        specRows={specRows}
+        mode={column.kind}
+        readOnly={readOnly}
+        onChange={onChange}
+      />
+    );
+  }
 
   if (column.kind === "code") {
     return (
@@ -1487,6 +1541,402 @@ function CellEditor({ column, value, onChange }: CellEditorProps) {
       onChange={onChange}
       placeholder={column.name}
     />
+  );
+}
+
+type SelectionCellEditorProps = {
+  value: string;
+  specRows: SpecRowsByTable;
+  mode: "selection" | "multi-selection";
+  readOnly: boolean;
+  onChange: (value: string) => void;
+};
+
+function SelectionCellEditor({
+  value,
+  specRows,
+  mode,
+  readOnly,
+  onChange,
+}: SelectionCellEditorProps) {
+  const theme = useHostTheme();
+  const fieldRef = useRef<HTMLSpanElement>(null);
+  const [open, setOpen] = useState(false);
+  const [menuBox, setMenuBox] = useState<SelectionMenuBox | null>(null);
+  const [activeGroupId, setActiveGroupId] = useState(
+    selectionCatalogGroups[0]?.id ?? "",
+  );
+  const multiple = mode === "multi-selection";
+  const selected = multiple
+    ? parseMultiSelectionValue(value)
+    : parseSelectionValue(value);
+  const placeholder = multiple ? "Choose items" : "Choose one";
+
+  const writeRefs = (refs: SelectionRef[]) =>
+    onChange(
+      multiple
+        ? serializeMultiSelectionValue(refs)
+        : serializeSelectionValue(refs[0] ?? null),
+    );
+
+  const removeRef = (ref: SelectionRef) =>
+    writeRefs(
+      selected.filter((item) => selectionRefKey(item) !== selectionRefKey(ref)),
+    );
+
+  const chooseRef = (ref: SelectionRef) => {
+    const key = selectionRefKey(ref);
+    const alreadySelected = selected.some(
+      (item) => selectionRefKey(item) === key,
+    );
+    if (multiple) {
+      writeRefs(
+        alreadySelected
+          ? selected.filter((item) => selectionRefKey(item) !== key)
+          : [...selected, ref],
+      );
+      return;
+    }
+    writeRefs(alreadySelected ? [] : [ref]);
+    setOpen(false);
+    setMenuBox(null);
+  };
+
+  const activeGroup =
+    selectionCatalogGroups.find((group) => group.id === activeGroupId) ??
+    selectionCatalogGroups[0];
+  const options = activeGroup
+    ? catalogOptionsForGroup(specRows, activeGroup)
+    : [];
+
+  const isSelected = (ref: SelectionRef) =>
+    selected.some((item) => selectionRefKey(item) === selectionRefKey(ref));
+
+  const syncMenuBox = () => {
+    const rect = fieldRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    setMenuBox(placeSelectionMenu(rect));
+  };
+
+  const toggleOpen = () => {
+    if (open) {
+      setOpen(false);
+      setMenuBox(null);
+      return;
+    }
+    syncMenuBox();
+    setOpen(true);
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    const onViewportChange = () => syncMenuBox();
+    window.addEventListener("resize", onViewportChange);
+    window.addEventListener("scroll", onViewportChange, true);
+    return () => {
+      window.removeEventListener("resize", onViewportChange);
+      window.removeEventListener("scroll", onViewportChange, true);
+    };
+  }, [open]);
+
+  return (
+    <span
+      style={{
+        display: "block",
+        minWidth: SELECTION_CELL_MIN_WIDTH,
+      }}
+    >
+      <span
+        ref={fieldRef}
+        role={readOnly ? undefined : "button"}
+        tabIndex={readOnly ? undefined : 0}
+        onClick={readOnly ? undefined : toggleOpen}
+        onKeyDown={
+          readOnly
+            ? undefined
+            : (event: { key: string; preventDefault: () => void }) => {
+                if (event.key !== "Enter" && event.key !== " ") return;
+                event.preventDefault();
+                toggleOpen();
+              }
+        }
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+          boxSizing: "border-box",
+          width: "100%",
+          minHeight: SELECTION_FIELD_MIN_HEIGHT,
+          padding: "6px 8px",
+          fontSize: 13,
+          lineHeight: "18px",
+          cursor: readOnly ? "default" : "pointer",
+          color: theme.text.primary,
+          background: theme.fill.tertiary,
+          border: `1px solid ${
+            open ? theme.accent.primary : theme.stroke.secondary
+          }`,
+          borderRadius: theme.radius.sm,
+          outline: "none",
+        }}
+      >
+        <span
+          style={{
+            flex: 1,
+            minWidth: 0,
+            display: "flex",
+            flexWrap: "wrap",
+            alignItems: "center",
+            gap: 4,
+          }}
+        >
+          {selected.length === 0 ? (
+            <span style={{ color: theme.text.tertiary }}>
+              {readOnly ? "The agent writes this column." : placeholder}
+            </span>
+          ) : (
+            selected.map((ref) => (
+              <SelectionChip
+                key={selectionRefKey(ref)}
+                resolved={resolveSelectionRef(specRows, ref)}
+                onRemove={
+                  readOnly || !multiple ? undefined : () => removeRef(ref)
+                }
+              />
+            ))
+          )}
+        </span>
+        {!readOnly && (
+          <span
+            aria-hidden
+            style={{
+              flexShrink: 0,
+              fontSize: 10,
+              color: theme.text.tertiary,
+            }}
+          >
+            {open ? "▴" : "▾"}
+          </span>
+        )}
+      </span>
+      {open && !readOnly && menuBox && (
+        <>
+          <span
+            onClick={() => {
+              setOpen(false);
+              setMenuBox(null);
+            }}
+            style={{ position: "fixed", inset: 0, zIndex: 20 }}
+          />
+          <span
+            role="listbox"
+            style={{
+              position: "fixed",
+              top: menuBox.top,
+              left: menuBox.left,
+              width: menuBox.width,
+              zIndex: 21,
+              display: "block",
+              background: theme.bg.elevated,
+              border: `1px solid ${theme.stroke.secondary}`,
+              borderRadius: theme.radius.sm,
+              overflow: "hidden",
+            }}
+          >
+            <span
+              style={{
+                display: "flex",
+                borderBottom: `1px solid ${theme.stroke.tertiary}`,
+              }}
+            >
+              {selectionCatalogGroups.map((group) => (
+                <SelectionMenuTab
+                  key={group.id}
+                  title={group.title}
+                  active={group.id === activeGroup?.id}
+                  onSelect={() => setActiveGroupId(group.id)}
+                />
+              ))}
+            </span>
+            <span
+              style={{
+                display: "block",
+                maxHeight: SELECTION_MENU_MAX_HEIGHT,
+                overflowY: "auto",
+                padding: 4,
+              }}
+            >
+              {options.length === 0 ? (
+                <span
+                  style={{
+                    display: "block",
+                    padding: "6px 8px",
+                    fontSize: 12,
+                    color: theme.text.tertiary,
+                  }}
+                >
+                  No rows yet.
+                </span>
+              ) : (
+                options.map((option) => (
+                  <SelectionOptionRow
+                    key={selectionRefKey(option)}
+                    label={resolveSelectionRef(specRows, option).label}
+                    checked={isSelected(option)}
+                    onChoose={() => chooseRef(option)}
+                  />
+                ))
+              )}
+            </span>
+          </span>
+        </>
+      )}
+    </span>
+  );
+}
+
+function SelectionChip({
+  resolved,
+  onRemove,
+}: {
+  resolved: ResolvedSelectionRef;
+  onRemove?: () => void;
+}) {
+  const theme = useHostTheme();
+  // A single-selection value reads as plain text; only lists need chips.
+  if (!onRemove) {
+    return (
+      <span
+        style={{
+          color: resolved.missing ? theme.text.tertiary : theme.text.primary,
+          fontStyle: resolved.missing ? "italic" : "normal",
+        }}
+      >
+        {resolved.label}
+      </span>
+    );
+  }
+  return (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 4,
+        padding: "1px 6px",
+        fontSize: 12,
+        lineHeight: "16px",
+        color: resolved.missing ? theme.text.tertiary : theme.text.secondary,
+        fontStyle: resolved.missing ? "italic" : "normal",
+        background: theme.fill.secondary,
+        borderRadius: theme.radius.sm,
+      }}
+    >
+      {resolved.label}
+      <span
+        role="button"
+        aria-label={`Remove ${resolved.label}`}
+        onClick={(event: { stopPropagation: () => void }) => {
+          event.stopPropagation();
+          onRemove();
+        }}
+        style={{ cursor: "pointer", color: theme.text.tertiary }}
+      >
+        ×
+      </span>
+    </span>
+  );
+}
+
+function SelectionMenuTab({
+  title,
+  active,
+  onSelect,
+}: {
+  title: string;
+  active: boolean;
+  onSelect: () => void;
+}) {
+  const theme = useHostTheme();
+  return (
+    <span
+      role="tab"
+      aria-selected={active}
+      onClick={onSelect}
+      style={{
+        flex: 1,
+        textAlign: "center",
+        padding: "6px 8px",
+        fontSize: 12,
+        cursor: "pointer",
+        color: active ? theme.text.primary : theme.text.tertiary,
+        // Pull the underline over the container border so the two lines meet.
+        marginBottom: -1,
+        borderBottom: `1px solid ${
+          active ? theme.accent.primary : "transparent"
+        }`,
+      }}
+    >
+      {title}
+    </span>
+  );
+}
+
+function SelectionOptionRow({
+  label,
+  checked,
+  onChoose,
+}: {
+  label: string;
+  checked: boolean;
+  onChoose: () => void;
+}) {
+  const theme = useHostTheme();
+  // Inline styles cannot express `:hover`, so the highlight is tracked here.
+  const [hovered, setHovered] = useState(false);
+  return (
+    <span
+      role="option"
+      aria-selected={checked}
+      onClick={onChoose}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        padding: "5px 8px",
+        fontSize: 12,
+        lineHeight: "16px",
+        cursor: "pointer",
+        color: theme.text.primary,
+        background: hovered ? theme.fill.secondary : "transparent",
+        borderRadius: theme.radius.sm,
+      }}
+    >
+      <span
+        aria-hidden
+        style={{
+          width: 12,
+          flexShrink: 0,
+          textAlign: "center",
+          color: theme.accent.primary,
+          visibility: checked ? "visible" : "hidden",
+        }}
+      >
+        ✓
+      </span>
+      <span
+        style={{
+          flex: 1,
+          minWidth: 0,
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap",
+        }}
+      >
+        {label}
+      </span>
+    </span>
   );
 }
 
@@ -2066,4 +2516,99 @@ function createRowId(): string {
 
 function createColumnId(): string {
   return `col-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function newColumnName(kind: ColumnKind): string {
+  if (kind === "code") return "Interface";
+  if (kind === "selection") return "Selection";
+  if (kind === "multi-selection") return "Multi-selection";
+  return "Column";
+}
+
+function isSelectionRef(value: unknown): value is SelectionRef {
+  if (!value || typeof value !== "object") return false;
+  const record = value as { tableId?: unknown; rowId?: unknown };
+  return typeof record.tableId === "string" && typeof record.rowId === "string";
+}
+
+function parseSelectionValue(value: string): SelectionRef[] {
+  if (!value.trim()) return [];
+  try {
+    const parsed = JSON.parse(value);
+    return isSelectionRef(parsed) ? [parsed] : [];
+  } catch {
+    return [];
+  }
+}
+
+function parseMultiSelectionValue(value: string): SelectionRef[] {
+  if (!value.trim()) return [];
+  try {
+    const parsed = JSON.parse(value);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(isSelectionRef);
+  } catch {
+    return [];
+  }
+}
+
+function serializeSelectionValue(ref: SelectionRef | null): string {
+  return ref ? JSON.stringify(ref) : "";
+}
+
+function serializeMultiSelectionValue(refs: SelectionRef[]): string {
+  return refs.length === 0 ? "" : JSON.stringify(refs);
+}
+
+function selectionRefKey(ref: SelectionRef): string {
+  return `${ref.tableId}:${ref.rowId}`;
+}
+
+function optionLabel(row: SpecRow): string {
+  const label = (row.cells[0] ?? "").trim();
+  return label.length > 0 ? label : "Untitled";
+}
+
+function catalogOptionsForGroup(
+  specRows: SpecRowsByTable,
+  group: SelectionCatalogGroup,
+): SelectionRef[] {
+  return group.tables.flatMap((table) =>
+    (specRows[table.id] ?? []).map((row) => ({
+      tableId: table.id,
+      rowId: row.id,
+    })),
+  );
+}
+
+type ResolvedSelectionRef = { label: string; missing: boolean };
+
+type SelectionMenuBox = { top: number; left: number; width: number };
+
+function placeSelectionMenu(rect: {
+  top: number;
+  bottom: number;
+  left: number;
+  width: number;
+}): SelectionMenuBox {
+  const width = Math.max(rect.width, SELECTION_MENU_WIDTH);
+  const maxLeft = Math.max(8, window.innerWidth - width - 8);
+  const left = Math.min(Math.max(8, rect.left), maxLeft);
+  const below = rect.bottom + 4;
+  const estimatedHeight = SELECTION_MENU_MAX_HEIGHT + 36;
+  const spaceBelow = window.innerHeight - below;
+  const top =
+    spaceBelow < estimatedHeight && rect.top > estimatedHeight
+      ? rect.top - estimatedHeight
+      : below;
+  return { top, left, width };
+}
+
+function resolveSelectionRef(
+  specRows: SpecRowsByTable,
+  ref: SelectionRef,
+): ResolvedSelectionRef {
+  const row = (specRows[ref.tableId] ?? []).find((item) => item.id === ref.rowId);
+  if (!row) return { label: "Missing item", missing: true };
+  return { label: optionLabel(row), missing: false };
 }
