@@ -3,6 +3,9 @@
 
 Reads Cursor hook JSON from stdin. Writes {} to stdout. Never copies
 *.canvas.data.json (those files are per workspace).
+
+The agent rule goes to the user rules folder, not into the workspace, so
+that no product repo can commit it.
 """
 
 from __future__ import annotations
@@ -17,6 +20,7 @@ from pathlib import Path
 SOURCE_ROOT = Path.home() / "Projects" / "software-engineering-workbench"
 CANVAS_NAME = "workbench.canvas.tsx"
 RULE_NAME = "workbench-canvas.mdc"
+USER_RULES_DIR = Path.home() / ".cursor" / "rules"
 
 
 def cursor_project_dir(workspace_root: str) -> Path:
@@ -47,11 +51,20 @@ def sync_workspace(workspace_root: str) -> None:
 
     canvases_dir = cursor_project_dir(workspace_root) / "canvases"
     atomic_copy(canvas_source, canvases_dir / CANVAS_NAME)
+    remove_legacy_project_rule(workspace_root)
 
+
+def remove_legacy_project_rule(workspace_root: str) -> None:
+    # Earlier versions wrote the rule into the workspace. Remove that copy so
+    # it cannot be committed to a product repo.
+    legacy_rule = Path(workspace_root) / ".cursor" / "rules" / RULE_NAME
+    legacy_rule.unlink(missing_ok=True)
+
+
+def sync_user_rule() -> None:
     rule_source = SOURCE_ROOT / "rules" / RULE_NAME
     if rule_source.is_file():
-        rules_dir = Path(workspace_root) / ".cursor" / "rules"
-        atomic_copy(rule_source, rules_dir / RULE_NAME)
+        atomic_copy(rule_source, USER_RULES_DIR / RULE_NAME)
 
 
 def main() -> int:
@@ -64,6 +77,11 @@ def main() -> int:
     roots = payload.get("workspace_roots") or []
     if isinstance(roots, str):
         roots = [roots]
+
+    try:
+        sync_user_rule()
+    except OSError:
+        pass
 
     for root in roots:
         if isinstance(root, str) and root:

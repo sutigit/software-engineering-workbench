@@ -50,20 +50,25 @@ type TaskSpec = {
 
 type TaskSpecsById = Record<string, TaskSpec>;
 type TaskArchitectureById = Record<string, ArchitectureDiagram[]>;
+type TaskResearchById = Record<string, TaskResearch>;
 
 type SpecUpdate = (spec: TaskSpec) => TaskSpec;
 type DiagramsUpdate = (
   diagrams: ArchitectureDiagram[],
 ) => ArchitectureDiagram[];
+type ResearchUpdate = (research: TaskResearch) => TaskResearch;
 
 // Every surface page receives the whole task data set and picks what it
-// shows. The spec pages use `spec`; the Architecture page uses `diagrams`.
+// shows. The spec pages use `spec`; the Architecture page uses `diagrams`;
+// the Research page uses `research`.
 type SurfacePageProps = {
   task: Task;
   spec: TaskSpec;
   onChangeSpec: (update: SpecUpdate) => void;
   diagrams: ArchitectureDiagram[];
   onChangeDiagrams: (update: DiagramsUpdate) => void;
+  research: TaskResearch;
+  onChangeResearch: (update: ResearchUpdate) => void;
 };
 
 type SurfacePage = typeof FeatureSpecificationPage;
@@ -76,6 +81,13 @@ type Surface = {
 };
 
 const surfaces: Surface[] = [
+  {
+    id: "research",
+    title: "Research",
+    purpose:
+      "Start the task with four questions. The agent reads the answers as context.",
+    Page: ResearchPage,
+  },
   {
     id: "feature-specification",
     title: "Feature specification",
@@ -112,6 +124,18 @@ const surfaces: Surface[] = [
     purpose: "List the integration tests of the feature.",
     Page: IntegrationTestsPage,
   },
+  {
+    id: "e2e-tests",
+    title: "E2E tests",
+    purpose: "List the end-to-end tests of the feature.",
+    Page: E2eTestsPage,
+  },
+  {
+    id: "deliverables",
+    title: "Deliverables",
+    purpose: "List what the feature delivers.",
+    Page: DeliverablesPage,
+  },
 ];
 
 export default function WorkbenchCanvas() {
@@ -122,6 +146,10 @@ export default function WorkbenchCanvas() {
   );
   const [taskArchitecture, setTaskArchitecture] =
     useCanvasState<TaskArchitectureById>("taskArchitecture", {});
+  const [taskResearch, setTaskResearch] = useCanvasState<TaskResearchById>(
+    "taskResearch",
+    {},
+  );
   const [storedTaskId, setTaskId] = useCanvasState<string>("hubTask", "");
   const [storedPageId, setPageId] = useCanvasState<string>(
     "hubPage",
@@ -152,6 +180,7 @@ export default function WorkbenchCanvas() {
     );
     setTaskSpecs((previous) => withoutKey(previous, taskId));
     setTaskArchitecture((previous) => withoutKey(previous, taskId));
+    setTaskResearch((previous) => withoutKey(previous, taskId));
   };
 
   const updateSpec = (taskId: string, update: SpecUpdate) =>
@@ -164,6 +193,12 @@ export default function WorkbenchCanvas() {
     setTaskArchitecture((previous) => ({
       ...previous,
       [taskId]: update(normalizeDiagrams(previous[taskId])),
+    }));
+
+  const updateResearch = (taskId: string, update: ResearchUpdate) =>
+    setTaskResearch((previous) => ({
+      ...previous,
+      [taskId]: update(normalizeResearch(previous[taskId])),
     }));
 
   return (
@@ -184,11 +219,13 @@ export default function WorkbenchCanvas() {
             pageId={pageId}
             spec={normalizeTaskSpec(taskSpecs[activeTask.id])}
             diagrams={normalizeDiagrams(taskArchitecture[activeTask.id])}
+            research={normalizeResearch(taskResearch[activeTask.id])}
             onSelectPage={setPageId}
             onRename={(name) => renameTask(activeTask.id, name)}
             onDelete={() => deleteTask(activeTask.id)}
             onChangeSpec={(update) => updateSpec(activeTask.id, update)}
             onChangeDiagrams={(update) => updateDiagrams(activeTask.id, update)}
+            onChangeResearch={(update) => updateResearch(activeTask.id, update)}
           />
         ) : (
           <NoTasksPage onCreate={createTask} />
@@ -462,6 +499,175 @@ function createTaskId(): string {
   return `task-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+// MARK: - Research
+
+// Research is the entry point of a task: four fixed questions, one notes
+// field each, stored in `taskResearch[taskId]`. It is deliberately short and
+// free-form so the user can start with one sentence. The agent reads the
+// answers as context; it does not turn them into a spec here.
+
+type TaskResearch = {
+  situation: string;
+  outcome: string;
+  known: string;
+  unclear: string;
+};
+
+type ResearchQuestion = {
+  field: keyof TaskResearch;
+  question: string;
+  hint: string;
+};
+
+// Prose reads best in a narrower column than the spec tables.
+const RESEARCH_PAGE_MAX_WIDTH = 760;
+const NOTES_MIN_ROWS = 4;
+const RESEARCH_PAGE_INTRO =
+  "Answer what you can. Empty answers are fine. Edits are saved " +
+  "automatically. The agent reads these notes before it works on the task.";
+
+const researchQuestions: ResearchQuestion[] = [
+  {
+    field: "situation",
+    question: "What is going on?",
+    hint:
+      "The current situation: a bug, a messy area, a missing piece, or a " +
+      "change you want. Write it as you would tell a colleague.",
+  },
+  {
+    field: "outcome",
+    question: "What should be different when this is done?",
+    hint: "The outcome in plain words. Not stories, not tests.",
+  },
+  {
+    field: "known",
+    question: "What do I already know?",
+    hint:
+      "Facts, hunches, file names, modules, past attempts, and what must " +
+      "not change. Rough notes are enough.",
+  },
+  {
+    field: "unclear",
+    question: "What is still unclear?",
+    hint: "Questions, doubts, and things to check. Answers can wait.",
+  },
+];
+
+function ResearchPage({ research, onChangeResearch }: SurfacePageProps) {
+  const editField = (field: keyof TaskResearch, value: string) =>
+    onChangeResearch((current) => ({ ...current, [field]: value }));
+
+  return (
+    <Stack gap={24} style={{ maxWidth: RESEARCH_PAGE_MAX_WIDTH }}>
+      <Stack gap={8}>
+        <H2>Research</H2>
+        <Text size="small" tone="tertiary">
+          {RESEARCH_PAGE_INTRO}
+        </Text>
+      </Stack>
+      {researchQuestions.map((item) => (
+        <ResearchQuestionSection
+          key={item.field}
+          item={item}
+          value={research[item.field]}
+          onChange={(value) => editField(item.field, value)}
+        />
+      ))}
+    </Stack>
+  );
+}
+
+type ResearchQuestionSectionProps = {
+  item: ResearchQuestion;
+  value: string;
+  onChange: (value: string) => void;
+};
+
+function ResearchQuestionSection({
+  item,
+  value,
+  onChange,
+}: ResearchQuestionSectionProps) {
+  return (
+    <Stack gap={8}>
+      <Stack gap={2}>
+        <Text weight="semibold">{item.question}</Text>
+        <Text size="small" tone="tertiary">
+          {item.hint}
+        </Text>
+      </Stack>
+      <NotesTextarea
+        value={value}
+        onChange={onChange}
+        placeholder="Notes"
+        label={item.question}
+      />
+    </Stack>
+  );
+}
+
+type NotesTextareaProps = {
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+  label: string;
+};
+
+// A plain multi-line text field in the style of the spec text cells. It
+// starts at NOTES_MIN_ROWS and grows with its content, so notes never scroll
+// inside the field.
+function NotesTextarea({
+  value,
+  onChange,
+  placeholder,
+  label,
+}: NotesTextareaProps) {
+  const theme = useHostTheme();
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  useFitHeightToContent(textareaRef, value);
+
+  return (
+    <textarea
+      ref={textareaRef}
+      value={value}
+      placeholder={placeholder}
+      rows={NOTES_MIN_ROWS}
+      aria-label={label}
+      onChange={(event: { currentTarget: HTMLTextAreaElement }) =>
+        onChange(event.currentTarget.value)
+      }
+      style={{
+        boxSizing: "border-box",
+        display: "block",
+        width: "100%",
+        resize: "none",
+        overflow: "hidden",
+        font: "inherit",
+        fontSize: 13,
+        lineHeight: "18px",
+        padding: 8,
+        color: theme.text.primary,
+        background: theme.fill.tertiary,
+        border: `1px solid ${theme.stroke.secondary}`,
+        borderRadius: theme.radius.sm,
+        outline: "none",
+      }}
+    />
+  );
+}
+
+// A stored research entry can predate a field. Missing fields read as empty.
+function normalizeResearch(
+  research: Partial<TaskResearch> | undefined,
+): TaskResearch {
+  return {
+    situation: research?.situation ?? "",
+    outcome: research?.outcome ?? "",
+    known: research?.known ?? "",
+    unclear: research?.unclear ?? "",
+  };
+}
+
 // MARK: - Architecture
 
 // A task holds a list of mermaid diagrams in `taskArchitecture[taskId]`.
@@ -726,6 +932,32 @@ function createDiagram(): ArchitectureDiagram {
 
 function createDiagramId(): string {
   return `arch-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+// MARK: - Stub surfaces
+
+// E2E tests and Deliverables are placeholders. They store nothing and read
+// nothing from the task data set.
+
+const STUB_PAGE_INTRO = "This tab has no content yet.";
+
+function E2eTestsPage(_props: SurfacePageProps) {
+  return <StubPage title="E2E tests" />;
+}
+
+function DeliverablesPage(_props: SurfacePageProps) {
+  return <StubPage title="Deliverables" />;
+}
+
+function StubPage({ title }: { title: string }) {
+  return (
+    <Stack gap={8} style={{ maxWidth: SPEC_PAGE_MAX_WIDTH }}>
+      <H2>{title}</H2>
+      <Text size="small" tone="tertiary">
+        {STUB_PAGE_INTRO}
+      </Text>
+    </Stack>
+  );
 }
 
 // MARK: - Feature specification
@@ -1776,22 +2008,7 @@ function TextCellEditor({
 }) {
   const theme = useHostTheme();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-
-  useEffect(() => {
-    const textarea = textareaRef.current;
-    if (!textarea) return;
-    fitHeightToContent(textarea);
-    // Wrapped lines change when the column width changes, not only when text changes.
-    // Only react to width so the height update does not retrigger the observer.
-    let lastWidth = textarea.clientWidth;
-    const observer = new ResizeObserver(() => {
-      if (textarea.clientWidth === lastWidth) return;
-      lastWidth = textarea.clientWidth;
-      fitHeightToContent(textarea);
-    });
-    observer.observe(textarea);
-    return () => observer.disconnect();
-  }, [value]);
+  useFitHeightToContent(textareaRef, value);
 
   return (
     <textarea
@@ -1838,6 +2055,28 @@ function TextCellEditor({
       }}
     />
   );
+}
+
+// Shared by every auto-growing textarea. Wrapped lines change when the width
+// changes, not only when the text changes. Only width triggers the observer
+// so the height update does not retrigger it.
+function useFitHeightToContent(
+  textareaRef: { current: HTMLTextAreaElement | null },
+  value: string,
+) {
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    fitHeightToContent(textarea);
+    let lastWidth = textarea.clientWidth;
+    const observer = new ResizeObserver(() => {
+      if (textarea.clientWidth === lastWidth) return;
+      lastWidth = textarea.clientWidth;
+      fitHeightToContent(textarea);
+    });
+    observer.observe(textarea);
+    return () => observer.disconnect();
+  }, [textareaRef, value]);
 }
 
 function fitHeightToContent(textarea: HTMLTextAreaElement) {

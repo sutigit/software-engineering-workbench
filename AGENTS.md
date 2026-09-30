@@ -17,21 +17,35 @@ task header. The task page shows an Overview tab plus one tab per surface from
 the `surfaces` array. The open task is stored in `hubTask`, the open tab in
 `hubPage`.
 
-A surface is one tab in a task, an optional workspace rule for agents, and
-per-workspace data that stays local. All surfaces share
-`workbench.canvas.data.json`. Surface data is keyed by task id: `taskSpecs`
-holds the spec tables, written by both the user and the agent, and
-`taskArchitecture` holds the mermaid diagrams of the Architecture surface.
-Each spec surface owns its own tables inside `taskSpecs`.
+A surface is one tab in a task, an optional agent rule installed as a user
+rule in `~/.cursor/rules/`, and per-workspace data that stays local. All surfaces share
+`workbench.canvas.data.json`. Surface data is keyed by task id:
+`taskResearch` holds the four Research notes, `taskSpecs` holds the spec
+tables, written by both the user and the agent, and `taskArchitecture` holds
+the mermaid diagrams of the Architecture surface. Each spec surface owns its
+own tables inside `taskSpecs`.
 
-| Surface               | Page component             | Workspace rule               | Status |
+| Surface               | Page component             | Agent rule                   | Status |
 | --------------------- | -------------------------- | ---------------------------- | ------ |
+| Research              | `ResearchPage`             | `rules/workbench-canvas.mdc` | Active |
 | Feature specification | `FeatureSpecificationPage` | `rules/workbench-canvas.mdc` | Active |
 | Architecture          | `ArchitecturePage`         | `rules/workbench-canvas.mdc` | Active |
 | UI elements           | `UiElementsPage`           | `rules/workbench-canvas.mdc` | Active |
 | Functional elements   | `FunctionalElementsPage`   | `rules/workbench-canvas.mdc` | Active |
 | Unit tests            | `UnitTestsPage`            | `rules/workbench-canvas.mdc` | Active |
 | Integration tests     | `IntegrationTestsPage`     | `rules/workbench-canvas.mdc` | Active |
+| E2E tests             | `E2eTestsPage`             | none                         | Stub   |
+| Deliverables          | `DeliverablesPage`         | none                         | Stub   |
+
+A Stub surface renders `StubPage`: a title and a note. It stores no data
+and has no agent rule section.
+
+Research stores one `TaskResearch` per task in `taskResearch[taskId]`: four
+fixed questions (`situation`, `outcome`, `known`, `unclear`), each a
+free-text string edited in a `NotesTextarea`. The questions live in
+`researchQuestions` in the canvas source. The agent reads the answers as
+context; the Research section of `rules/workbench-canvas.mdc` says when it
+may write them.
 
 Feature specification, UI elements, Functional elements, Unit tests, and
 Integration tests are tabs over one task's data set. They render `SpecPage`
@@ -75,8 +89,8 @@ Applies to every current and future surface.
 - UI imports from `cursor/canvas` only. Follow the Cursor canvas skill.
 - Every cell is writable by the user in the canvas and by the agent in the
   data file. How the agent writes each surface is defined in a section of
-  `rules/workbench-canvas.mdc`, the one rule the hook copies into
-  workspaces. Do not restate it here.
+  `rules/workbench-canvas.mdc`, the one rule the hook copies to
+  `~/.cursor/rules/`. Do not restate it here.
 
 ## Change protocol
 

@@ -2,7 +2,9 @@
 
 How to open and use the workbench inside a Cursor workspace. Setup of the sync
 hook is in `README.md`. The rule that agents follow inside your workspace is
-`rules/workbench-canvas.mdc`. Instructions for agents that change the
+`rules/workbench-canvas.mdc`. The hook installs it as a user rule in
+`~/.cursor/rules/`, so it stays on your machine and out of your repos.
+Instructions for agents that change the
 workbench itself are in `AGENTS.md`.
 
 ## Open the workbench
@@ -32,10 +34,15 @@ The workbench opens with a sidebar on the left and a task page on the right.
 
 ## Tasks
 
-A task is one unit of work. It has a name and seven tabs: **Overview**,
-**Feature specification**, **Architecture**, **UI elements**, **Functional
-elements**, **Unit tests**, and **Integration tests**. Each task has its own
-content in every tab.
+A task is one unit of work. It has a name and ten tabs, in this order:
+**Overview**, **Research**, **Feature specification**, **Architecture**,
+**UI elements**, **Functional elements**, **Unit tests**, **Integration
+tests**, **E2E tests**, and **Deliverables**. Each task has its own content
+in every tab.
+
+**E2E tests** and **Deliverables** are placeholders. Each shows its title
+and the note "This tab has no content yet." They have no tables and store
+nothing.
 
 - **+ New task** at the bottom of the sidebar adds a task named
   "Untitled task" and opens its Overview tab.
@@ -43,7 +50,7 @@ content in every tab.
   sidebar shows the new name as you type.
 - **Delete task** next to the name asks "Delete this task and all its
   content?". **Delete** removes the task and its tabs. **Cancel** keeps it.
-- The tab bar under the name switches between the seven tabs.
+- The tab bar under the name switches between the ten tabs.
 - **Overview** shows one card per tab in a two-column grid. **Open** on a
   card shows that tab.
 
@@ -55,6 +62,30 @@ are saved automatically. Nothing is shared between workspaces, and nothing is
 uploaded.
 
 A fresh workspace opens empty.
+
+## Research
+
+The **Research** tab is the place to start a task. It asks four questions.
+Each question has a short hint and one **Notes** field under it:
+
+1. **What is going on?**
+2. **What should be different when this is done?**
+3. **What do I already know?**
+4. **What is still unclear?**
+
+- Write in your own words. One sentence is enough to start. Empty answers
+  are fine.
+- A **Notes** field starts at four lines and grows with its content. It does
+  not scroll inside the field. `Tab` moves to the next field.
+- Edits are saved automatically.
+
+### Work with the agent
+
+- The agent reads all four answers before it works on the task. Your
+  "already know" notes are hints it checks in the repo. Your "unclear" notes
+  are the first things it looks up.
+- The agent does not fill this tab on its own and does not turn it into
+  requirements here. Ask it to write a field if you want that.
 
 ## Spec and test tables
 
@@ -158,8 +189,9 @@ Selection and multi-selection cells:
 
 ### Work with the agent
 
-1. Fill the cells you know on Feature specification, UI elements, and
-   Functional elements, and mark which rows matter.
+1. Answer the Research questions, then fill the cells you know on Feature
+   specification, UI elements, and Functional elements, and mark which rows
+   matter.
 2. Fill Unit tests and Integration tests, or ask the agent to add those rows.
 3. Ask the agent to implement the specification, or to fill the cells you
    left empty. Name the task, or leave the task open; the agent uses the

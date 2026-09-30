@@ -2,5 +2,3 @@
 node_modules/
 *.canvas.data.json
 *.canvas.status.json
-# Copy of rules/workbench-canvas.mdc that the sync hook writes into this workspace.
-.cursor/rules/workbench-canvas.mdc

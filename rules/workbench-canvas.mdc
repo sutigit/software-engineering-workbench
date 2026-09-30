@@ -1,5 +1,5 @@
 ---
-description: Data layout of the Workbench canvas. Agent and user share every spec cell, test row, and Architecture mermaid source.
+description: Data layout of the Workbench canvas. Agent reads Research notes; agent and user share every spec cell, test row, and Architecture mermaid source.
 alwaysApply: true
 ---
 
@@ -14,19 +14,49 @@ that file into each workspace. Do not treat the workspace copy as the source.
 
 ## Tasks
 
-The sidebar lists tasks. Each task has its own Feature specification (tables
-`user-stories`, `acceptance-criteria`, `functional-requirements`,
-`non-functional-requirements`), Architecture (mermaid diagrams), UI elements
-(table `ui-elements`), Functional elements (table `react-hooks`), Unit tests
-(table `unit-tests`), and Integration tests (table `integration-tests`) tabs.
+The sidebar lists tasks. Each task has its own Research (four notes),
+Feature specification (tables `user-stories`, `acceptance-criteria`,
+`functional-requirements`, `non-functional-requirements`), Architecture
+(mermaid diagrams), UI elements (table `ui-elements`), Functional elements
+(table `react-hooks`), Unit tests (table `unit-tests`), and Integration tests
+(table `integration-tests`) tabs.
 
 - `tasks` is the ordered list of `{ "id", "name" }`.
+- `taskResearch.<taskId>` holds the Research notes of the task.
 - `taskSpecs.<taskId>` holds the spec of one task: `specColumns` and
   `specRows`, each keyed by table id.
 - `taskArchitecture.<taskId>` holds the Architecture diagrams of the task.
 
 Find a task by its `name` in `tasks` and use its `id` for the other keys.
 When the user does not name a task, use the one in `hubTask`.
+
+## Research
+
+`taskResearch.<taskId>` is the user's kickoff of the task: four questions,
+one free-text answer each.
+
+```json
+{
+  "taskResearch": {
+    "<taskId>": {
+      "situation": "What is going on?",
+      "outcome": "What should be different when this is done?",
+      "known": "What do I already know?",
+      "unclear": "What is still unclear?"
+    }
+  }
+}
+```
+
+A missing key or field reads as empty.
+
+- Read all four answers before you edit code or fill other tabs of the task.
+- Treat `known` as hints, not proof. Check the repo.
+- Treat `unclear` as the list of things to look up first, not as a spec.
+- Leave empty answers empty. Do not fill this tab on your own, and do not
+  turn it into requirements here; those belong on Feature specification.
+- Write a field only when the user asks. Keep the user's wording; append
+  rather than rewrite.
 
 ### Spec tables
 
